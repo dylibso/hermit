@@ -5,7 +5,7 @@ cmake_minimum_required (VERSION 3.14)
 
 include(CheckPIESupported)
 
-project (iwasm)
+project (hermit)
 
 set (CMAKE_VERBOSE_MAKEFILE OFF)
 
@@ -151,19 +151,20 @@ endif ()
 
 include (${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
 
-add_executable (iwasm src/main.c ${UNCOMMON_SHARED_SOURCE})
+set(CMAKE_EXECUTABLE_SUFFIX ".com")
 
-set_target_properties (iwasm PROPERTIES POSITION_INDEPENDENT_CODE ON)
-set_target_properties (iwasm PROPERTIES OUTPUT_NAME iwasm.com)
-install (TARGETS iwasm DESTINATION bin)
+add_executable (hermit-base src/main.c ${UNCOMMON_SHARED_SOURCE})
+set_target_properties (hermit-base PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries (hermit-base vmlib ${LLVM_AVAILABLE_LIBS} ${UV_A_LIBS} ${WASI_NN_LIBS} -lm -ldl -lpthread)
 
-target_link_libraries (iwasm vmlib ${LLVM_AVAILABLE_LIBS} ${UV_A_LIBS} ${WASI_NN_LIBS} -lm -ldl -lpthread)
+add_custom_command(OUTPUT "cowsay.hermit.com" COMMAND
+  sh ${CMAKE_CURRENT_SOURCE_DIR}/_build_hermit_from_base.sh ${CMAKE_CURRENT_SOURCE_DIR}/src/cowsay ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS hermit-base
+  VERBATIM)
+add_custom_target(cowsay-hermit ALL DEPENDS "cowsay.hermit.com")
 
-#add_library (libiwasm SHARED ${WAMR_RUNTIME_LIB_SOURCE})
-add_library (libiwasm STATIC ${WAMR_RUNTIME_LIB_SOURCE})
-
-install (TARGETS libiwasm DESTINATION lib)
-
-set_target_properties (libiwasm PROPERTIES OUTPUT_NAME iwasm)
-
-target_link_libraries (libiwasm ${LLVM_AVAILABLE_LIBS} ${UV_A_LIBS} ${WASI_NN_LIBS} -lm -ldl -lpthread)
+add_custom_command(OUTPUT "count_vowels.hermit.com" COMMAND
+  sh ${CMAKE_CURRENT_SOURCE_DIR}/_build_hermit_from_base.sh ${CMAKE_CURRENT_SOURCE_DIR}/src/count_vowels ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS hermit-base
+  VERBATIM)
+add_custom_target(count_vowels-hermit ALL DEPENDS "count_vowels.hermit.com")
