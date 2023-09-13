@@ -891,7 +891,7 @@ int main(int argc, char *argv[])
             }
         }
         fprintf(stderr, "hermit_loader: %s key: %.*s\n",
-                (found ? "found" : "unknown"), name->string_size, name->string);
+                (found ? "found" : "unknown"), (int)name->string_size, name->string);
     }
     free(json);
     app_argc = argc + 1;
