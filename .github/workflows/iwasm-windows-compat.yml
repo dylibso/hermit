@@ -13,4 +13,4 @@ jobs:
     runs-on: [ windows-latest ]
     steps: 
       - uses: actions/checkout@v4
-      - run: ./iwasm.com
+      - run: echo "hello, github" | ./iwasm.com src/cowsay/main.wasm
