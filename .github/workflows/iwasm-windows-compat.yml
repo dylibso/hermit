@@ -16,4 +16,4 @@ jobs:
       - name: "iwasm.com cowsay.wasm"
         shell: bash
         run: |
-          echo "hello, github" | sh ./iwasm.com src/cowsay/main.wasm
+          echo "hello, github" | bash -c './iwasm.com src/cowsay/main.wasm'
