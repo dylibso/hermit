@@ -15,4 +15,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: "iwasm.com cowsay.wasm"
         shell: bash
-        run: echo "hello, github" | ./iwasm.com src/cowsay/main.wasm
+        run: |
+          chmod u+x iwasm.com
+          echo "hello, github" | sh ./iwasm.com src/cowsay/main.wasm
