@@ -17,4 +17,5 @@ jobs:
         shell: bash
         run: |
           chmod u+x ./iwasm.com
-          echo "hello, github" | bash -c './iwasm.com src/cowsay/main.wasm'
+          echo "hello, github" | bash -c './iwasm.com src/cowsay/main.wasm' > cowsay.out.txt
+          cat ./cowsay.out.txt
