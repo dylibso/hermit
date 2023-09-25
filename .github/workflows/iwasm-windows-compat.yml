@@ -1,0 +1,16 @@
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+    
+
+permissions:
+    contents: read
+
+
+jobs:
+  windows-iwasm-compat-check:
+    runs-on: [ windows-latest ]
+    steps: 
+      - uses: actions/checkout@v4
+      - run: ./iwasm.com
