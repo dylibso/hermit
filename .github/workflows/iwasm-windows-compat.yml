@@ -16,4 +16,5 @@ jobs:
       - name: "iwasm.com cowsay.wasm"
         shell: bash
         run: |
+          chmod u+x ./iwasm.com
           echo "hello, github" | bash -c './iwasm.com src/cowsay/main.wasm'
