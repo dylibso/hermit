@@ -64,7 +64,10 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 [[package]]
 name = "dockerfile-parser"
 version = "0.1.0"
+<<<<<<< HEAD
 source = "git+https://github.com/dylibso/dockerfile-parser-rs?branch=hermitfile-adaptation#d8a702a301b0b0ef953dc9e04b1890e45b924936"
+=======
+>>>>>>> b294e83 (feat: wip hermitfile parser based on dockerfile parser)
 dependencies = [
  "enquote",
  "lazy_static",
@@ -98,6 +101,7 @@ name = "hermitfile-parser"
 version = "0.1.0"
 dependencies = [
  "dockerfile-parser",
+<<<<<<< HEAD
  "serde",
  "serde_json",
 ]
@@ -109,6 +113,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af150ab688ff2122fcef229be89cb50dd66af9e01a4ff320cc137eecc9bacc38"
 
 [[package]]
+=======
+]
+
+[[package]]
+>>>>>>> b294e83 (feat: wip hermitfile parser based on dockerfile parser)
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -225,6 +234,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbb5fb1acd8a1a18b3dd5be62d25485eb770e05afb408a9627d14d451bae12da"
 
 [[package]]
+<<<<<<< HEAD
 name = "ryu"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -262,6 +272,8 @@ dependencies = [
 ]
 
 [[package]]
+=======
+>>>>>>> b294e83 (feat: wip hermitfile parser based on dockerfile parser)
 name = "sha2"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
