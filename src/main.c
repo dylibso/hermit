@@ -861,37 +861,91 @@ int main(int argc, char *argv[])
         return print_help();
     }
     const struct json_object_s *object = json->payload;
-    static const char *const keys[] = {"MAP", "NET", "ARGV", "ENV",
-                                       "ENTRYPOINT"};
+    typedef enum
+    {
+        HC_UNKNOWN = -1,
+        HC_MAP,
+        HC_NET,
+        HC_ARGV,
+        HC_ENV,
+        HC_ENTRYPOINT
+    } hermit_config_index;
+    typedef struct
+    {
+        const char *key;
+        hermit_config_index index;
+    } hermit_config_item;
+    static const hermit_config_item items[] = {
+        {"MAP", HC_MAP},
+        {"NET", HC_NET},
+        {"ARGV", HC_ARGV},
+        {"ENV", HC_ENV},
+        {"ENTRYPOINT", HC_ENTRYPOINT}};
     for (const struct json_object_element_s *item = object->start; item != NULL;
          item = item->next)
     {
         const struct json_string_s *name = item->name;
-        bool found = false;
-        for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
+        hermit_config_index config_index = HC_UNKNOWN;
+        for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++)
         {
-            if (is_string(keys[i], name->string, name->string_size))
+            if (is_string(items[i].key, name->string, name->string_size))
             {
-                found = true;
-                if (is_string("ENTRYPOINT", name->string, name->string_size))
-                {
-                    if (item->value->type != json_type_string)
-                    {
-                        free(json);
-                        fprintf(stderr, "ENTRYPOINT is not a string!\n");
-                        return print_help();
-                    }
-                    const struct json_string_s *value = item->value->payload;
-                    char *temp_func = malloc(value->string_size + 1);
-                    memcpy(temp_func, value->string, value->string_size);
-                    temp_func[value->string_size] = '\0';
-                    func_name = temp_func;
-                }
+                config_index = items[i].index;
                 break;
             }
         }
-        fprintf(stderr, "hermit_loader: %s key: %.*s\n",
-                (found ? "found" : "unknown"), (int)name->string_size, name->string);
+        switch (config_index)
+        {
+        case HC_ENTRYPOINT:
+        {
+            if (item->value->type != json_type_string)
+            {
+                free(json);
+                fprintf(stderr, "ENTRYPOINT is not a string!\n");
+                return print_help();
+            }
+            const struct json_string_s *value = item->value->payload;
+            char *temp_func = malloc(value->string_size + 1);
+            memcpy(temp_func, value->string, value->string_size);
+            temp_func[value->string_size] = '\0';
+            func_name = temp_func;
+            break;
+        }
+        case HC_MAP:
+        {
+            if (item->value->type != json_type_array)
+            {
+                free(json);
+                fprintf(stderr, "MAP is not an array!\n");
+                return print_help();
+            }
+            const struct json_array_s *value = item->value->payload;
+            if (value->length > 8)
+            {
+                free(json);
+                fprintf(stderr, "MAP too many items must be <= 8!\n");
+                return print_help();
+            }
+            dir_list_size = value->length;
+            int dlindex = 0;
+            for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
+            {
+                if (aitem->value->type != json_type_string)
+                {
+                    free(json);
+                    fprintf(stderr, "MAP must be an array of strings\n");
+                    return print_help();
+                }
+                const struct json_string_s *string = aitem->value->payload;
+                char *dir_item = malloc(string->string_size + 1);
+                memcpy(dir_item, string->string, string->string_size);
+                dir_item[string->string_size] = '\0';
+                dir_list[dlindex++] = dir_item;
+            }
+            break;
+        }
+        }
+        fprintf(stderr, "hermit_loader: %s key: %.*s\n", ((config_index != HC_UNKNOWN) ? "found" : "unknown"), (int)name->string_size, name->string);
     }
     free(json);
     app_argc = argc + 1;
