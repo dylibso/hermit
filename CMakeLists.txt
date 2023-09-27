@@ -172,3 +172,9 @@ add_custom_command(OUTPUT "count_vowels.hermit.com" COMMAND
   DEPENDS hermit-base
   VERBATIM)
 add_custom_target(count_vowels-hermit ALL DEPENDS "count_vowels.hermit.com")
+
+add_custom_command(OUTPUT "cat.hermit.com" COMMAND
+  sh ${CMAKE_CURRENT_SOURCE_DIR}/_build_hermit_from_base.sh ${CMAKE_CURRENT_SOURCE_DIR}/src/cat ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS hermit-base
+  VERBATIM)
+add_custom_target(cat-hermit ALL DEPENDS "cat.hermit.com")
