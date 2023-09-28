@@ -1,7 +1,7 @@
-#include <dirent.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 uint8_t buf[4096];
 
@@ -10,15 +10,15 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "usage: %s file0 <file1> <file2> <file...>\n", argv[0]);
     return 1;
   }
-  DIR *dir = opendir(".");
-  while (1) {
-    struct dirent *ent = readdir(dir);
-    if (!ent) {
-      break;
-    }
-    fprintf(stderr, "debug: readdir: %s\n", ent->d_name);
+
+  // HACK set WD based on PWD if provided as wasi doesn't have a way to
+  // initialize it
+  const char *wd = getenv("PWD");
+  if (wd != NULL) {
+    fprintf(stderr, "debug: changing $PWD to %s\n", wd);
+    chdir(wd);
   }
-  closedir(dir);
+
   for (int i = 1; i < argc; i++) {
     fprintf(stderr, "debug: processing %s\n", argv[i]);
     FILE *file = fopen(argv[i], "rb");

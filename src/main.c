@@ -496,6 +496,27 @@ is_string(const char *sz_string, const char bytes[], const size_t num_bytes)
     return (sz_len == num_bytes) && (memcmp(sz_string, bytes, num_bytes) == 0);
 }
 
+static const char *get_json_type_name(const json_type_t t)
+{
+#define X(name)       \
+    case name:        \
+        return #name; \
+        break;
+    switch (t)
+    {
+        X(json_type_string)
+        X(json_type_number)
+        X(json_type_object)
+        X(json_type_array)
+        X(json_type_true)
+        X(json_type_false)
+        X(json_type_null)
+    default:
+        return "UNKNOWN_TYPE";
+    }
+#undef X
+}
+
 int main(int argc, char *argv[])
 {
     int32 ret = -1;
@@ -865,6 +886,7 @@ int main(int argc, char *argv[])
     {
         HC_UNKNOWN = -1,
         HC_MAP,
+        HC_ENV_PWD_IS_HOST_CWD,
         HC_NET,
         HC_ARGV,
         HC_ENV,
@@ -873,14 +895,18 @@ int main(int argc, char *argv[])
     typedef struct
     {
         const char *key;
+        json_type_t type;
         hermit_config_index index;
     } hermit_config_item;
     static const hermit_config_item items[] = {
-        {"MAP", HC_MAP},
-        {"NET", HC_NET},
-        {"ARGV", HC_ARGV},
-        {"ENV", HC_ENV},
-        {"ENTRYPOINT", HC_ENTRYPOINT}};
+        {"MAP", json_type_array, HC_MAP},
+        {"ENV_PWD_IS_HOST_CWD",
+         json_type_true,
+         HC_ENV_PWD_IS_HOST_CWD},
+        {"ENV", json_type_array, HC_ENV},
+        {"NET", json_type_array, HC_NET},
+        {"ARGV", json_type_array, HC_ARGV},
+        {"ENTRYPOINT", json_type_string, HC_ENTRYPOINT}};
     for (const struct json_object_element_s *item = object->start; item != NULL;
          item = item->next)
     {
@@ -890,35 +916,20 @@ int main(int argc, char *argv[])
         {
             if (is_string(items[i].key, name->string, name->string_size))
             {
+                if (items[i].type != item->value->type)
+                {
+                    free(json);
+                    fprintf(stderr, "%s: expected %s got %s!\n", items[i].key, get_json_type_name(items[i].type), get_json_type_name(item->value->type));
+                    return print_help();
+                }
                 config_index = items[i].index;
                 break;
             }
         }
         switch (config_index)
         {
-        case HC_ENTRYPOINT:
-        {
-            if (item->value->type != json_type_string)
-            {
-                free(json);
-                fprintf(stderr, "ENTRYPOINT is not a string!\n");
-                return print_help();
-            }
-            const struct json_string_s *value = item->value->payload;
-            char *temp_func = malloc(value->string_size + 1);
-            memcpy(temp_func, value->string, value->string_size);
-            temp_func[value->string_size] = '\0';
-            func_name = temp_func;
-            break;
-        }
         case HC_MAP:
         {
-            if (item->value->type != json_type_array)
-            {
-                free(json);
-                fprintf(stderr, "MAP is not an array!\n");
-                return print_help();
-            }
             const struct json_array_s *value = item->value->payload;
             if (value->length > 8)
             {
@@ -944,6 +955,36 @@ int main(int argc, char *argv[])
             }
             break;
         }
+        case HC_ENV_PWD_IS_HOST_CWD:
+        {
+            if (env_list_size >= 8)
+            {
+                free(json);
+                fprintf(stderr, "ENV_PWD_IS_HOST_CWD too many env vars\n");
+                return print_help();
+            }
+            char *wd = getcwd(NULL, 0);
+            const size_t pwd_size = 4 + strlen(wd) + 1;
+            char *pwd = malloc(pwd_size);
+            snprintf(pwd, pwd_size, "PWD=%s", wd);
+            free(wd);
+            env_list[env_list_size++] = pwd;
+            break;
+        }
+        case HC_ENTRYPOINT:
+        {
+            const struct json_string_s *value = item->value->payload;
+            char *temp_func = malloc(value->string_size + 1);
+            memcpy(temp_func, value->string, value->string_size);
+            temp_func[value->string_size] = '\0';
+            func_name = temp_func;
+            break;
+        }
+        case HC_UNKNOWN:
+        case HC_ENV:
+        case HC_NET:
+        case HC_ARGV:
+            break;
         }
         fprintf(stderr, "hermit_loader: %s key: %.*s\n", ((config_index != HC_UNKNOWN) ? "found" : "unknown"), (int)name->string_size, name->string);
     }
