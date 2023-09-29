@@ -950,8 +950,7 @@ int main(int argc, char *argv[])
                 }
                 const struct json_string_s *string = aitem->value->payload;
                 char *dir_item = malloc(string->string_size + 1);
-                memcpy(dir_item, string->string, string->string_size);
-                dir_item[string->string_size] = '\0';
+                memcpy(dir_item, string->string, string->string_size + 1);
                 dir_list[dlindex++] = dir_item;
             }
             break;
@@ -966,9 +965,11 @@ int main(int argc, char *argv[])
                 return print_help();
             }
             char *wd = getcwd(NULL, 0);
-            const size_t pwd_size = 4 + strlen(wd) + 1;
+            static const char pwd_prefix[] = "PWD=";
+            const size_t wd_len = strlen(wd);
+            const size_t pwd_size = sizeof(pwd_prefix) + wd_len;
             char *pwd = malloc(pwd_size);
-            snprintf(pwd, pwd_size, "PWD=%s", wd);
+            memcpy(mempcpy(pwd, pwd_prefix, sizeof(pwd_prefix) - 1), wd, wd_len + 1);
             free(wd);
             env_list[env_list_size++] = pwd;
             break;
@@ -993,8 +994,7 @@ int main(int argc, char *argv[])
                 }
                 const struct json_string_s *string = aitem->value->payload;
                 char *env_item = malloc(string->string_size + 1);
-                memcpy(env_item, string->string, string->string_size);
-                env_item[string->string_size] = '\0';
+                memcpy(env_item, string->string, string->string_size + 1);
                 env_list[env_list_size++] = env_item;
             }
             break;
@@ -1003,8 +1003,7 @@ int main(int argc, char *argv[])
         {
             const struct json_string_s *value = item->value->payload;
             char *temp_func = malloc(value->string_size + 1);
-            memcpy(temp_func, value->string, value->string_size);
-            temp_func[value->string_size] = '\0';
+            memcpy(temp_func, value->string, value->string_size + 1);
             func_name = temp_func;
             break;
         }
@@ -1017,7 +1016,7 @@ int main(int argc, char *argv[])
     }
     free(json);
     app_argc = argc + 1;
-    app_argv = malloc(app_argc * sizeof(char *) + 1);
+    app_argv = malloc((app_argc + 1) * sizeof(char *));
     app_argv[0] = "/zip/main.wasm";
     for (int i = 0; i < argc; i++)
     {
@@ -1027,8 +1026,6 @@ int main(int argc, char *argv[])
     wasm_file = app_argv[0];
     argv = app_argv;
     argc = app_argc;
-    //  app_argc = argc;
-    //  app_argv = argv;
 
     memset(&init_args, 0, sizeof(RuntimeInitArgs));
 
