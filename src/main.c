@@ -931,10 +931,11 @@ int main(int argc, char *argv[])
         case HC_MAP:
         {
             const struct json_array_s *value = item->value->payload;
-            if (value->length > 8)
+            const size_t max_map_paths = sizeof(dir_list) / sizeof(dir_list[0]);
+            if (value->length > max_map_paths)
             {
                 free(json);
-                fprintf(stderr, "MAP too many items must be <= 8!\n");
+                fprintf(stderr, "MAP too many items must be <= max_map_paths!\n");
                 return print_help();
             }
             dir_list_size = value->length;
@@ -957,7 +958,8 @@ int main(int argc, char *argv[])
         }
         case HC_ENV_PWD_IS_HOST_CWD:
         {
-            if (env_list_size >= 8)
+            const size_t max_env = sizeof(env_list) / sizeof(env_list[0]);
+            if (env_list_size >= max_env)
             {
                 free(json);
                 fprintf(stderr, "ENV_PWD_IS_HOST_CWD too many env vars\n");
@@ -971,6 +973,32 @@ int main(int argc, char *argv[])
             env_list[env_list_size++] = pwd;
             break;
         }
+        case HC_ENV:
+        {
+            const struct json_array_s *value = item->value->payload;
+            const size_t max_env = sizeof(env_list) / sizeof(env_list[0]);
+            if (value->length > (max_env - env_list_size))
+            {
+                free(json);
+                fprintf(stderr, "ENV too many items\n");
+                return print_help();
+            }
+            for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
+            {
+                if (aitem->value->type != json_type_string)
+                {
+                    free(json);
+                    fprintf(stderr, "ENV must be an array of strings\n");
+                    return print_help();
+                }
+                const struct json_string_s *string = aitem->value->payload;
+                char *env_item = malloc(string->string_size + 1);
+                memcpy(env_item, string->string, string->string_size);
+                env_item[string->string_size] = '\0';
+                env_list[env_list_size++] = env_item;
+            }
+            break;
+        }
         case HC_ENTRYPOINT:
         {
             const struct json_string_s *value = item->value->payload;
@@ -981,7 +1009,6 @@ int main(int argc, char *argv[])
             break;
         }
         case HC_UNKNOWN:
-        case HC_ENV:
         case HC_NET:
         case HC_ARGV:
             break;
