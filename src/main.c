@@ -552,7 +552,8 @@ int main(int argc, char *argv[])
     bool disable_bounds_checks = false;
 #endif
 #if WASM_ENABLE_LIBC_WASI != 0
-    const char *dir_list[8] = {NULL};
+    const char **dir_list = NULL;
+    uint32 dir_list_max = 0;
     uint32 dir_list_size = 0;
     const char *env_list[8] = {NULL};
     uint32 env_list_size = 0;
@@ -703,11 +704,17 @@ int main(int argc, char *argv[])
         {
             if (argv[0][6] == '\0')
                 return print_help();
-            if (dir_list_size >= sizeof(dir_list) / sizeof(char *))
+            if (dir_list_size == dir_list_max)
             {
-                printf("Only allow max dir number %d\n",
-                       (int)(sizeof(dir_list) / sizeof(char *)));
-                return 1;
+                const uint32 new_dir_list_max = dir_list_max > 0 ? dir_list_max * 2 : 8;
+                const char **new_dir_list = realloc(dir_list, new_dir_list_max * sizeof(const char *));
+                if (new_dir_list == NULL)
+                {
+                    printf("dir_list: realloc failed %u -> %u\n", dir_list_max, new_dir_list_max);
+                    return 1;
+                }
+                dir_list = new_dir_list;
+                dir_list_max = new_dir_list_max;
             }
             dir_list[dir_list_size++] = argv[0] + 6;
         }
@@ -931,15 +938,18 @@ int main(int argc, char *argv[])
         case HC_MAP:
         {
             const struct json_array_s *value = item->value->payload;
-            const size_t max_map_paths = sizeof(dir_list) / sizeof(dir_list[0]);
-            if (value->length > max_map_paths)
+            if ((dir_list_size + value->length) > dir_list_max)
             {
-                free(json);
-                fprintf(stderr, "MAP too many items must be <= max_map_paths!\n");
-                return print_help();
+                const uint32 new_dir_list_max = dir_list_size + value->length;
+                const char **new_dir_list = realloc(dir_list, new_dir_list_max * sizeof(const char *));
+                if (new_dir_list == NULL)
+                {
+                    printf("dir_list: realloc failed %u -> %u\n", dir_list_max, new_dir_list_max);
+                    return 1;
+                }
+                dir_list = new_dir_list;
+                dir_list_max = new_dir_list_max;
             }
-            dir_list_size = value->length;
-            int dlindex = 0;
             for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
             {
                 if (aitem->value->type != json_type_string)
@@ -951,7 +961,7 @@ int main(int argc, char *argv[])
                 const struct json_string_s *string = aitem->value->payload;
                 char *dir_item = malloc(string->string_size + 1);
                 memcpy(dir_item, string->string, string->string_size + 1);
-                dir_list[dlindex++] = dir_item;
+                dir_list[dir_list_size++] = dir_item;
             }
             break;
         }
