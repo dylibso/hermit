@@ -517,6 +517,22 @@ static const char *get_json_type_name(const json_type_t t)
 #undef X
 }
 
+// similar to C++ vector reserve
+static bool reserve(const char ***list, uint32 *list_capacity, const uint32_t new_capacity)
+{
+    if (*list_capacity >= new_capacity)
+        return true;
+    const char **new_list = realloc(*list, new_capacity * sizeof(const char *));
+    if (new_list == NULL)
+    {
+        printf("%s: realloc failed %u -> %u\n", __func__, *list_capacity, new_capacity);
+        return false;
+    }
+    *list = new_list;
+    *list_capacity = new_capacity;
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
     int32 ret = -1;
@@ -555,7 +571,8 @@ int main(int argc, char *argv[])
     const char **dir_list = NULL;
     uint32 dir_list_max = 0;
     uint32 dir_list_size = 0;
-    const char *env_list[8] = {NULL};
+    const char **env_list = NULL;
+    uint32 env_list_max = 0;
     uint32 env_list_size = 0;
     const char *addr_pool[8] = {NULL};
     uint32 addr_pool_size = 0;
@@ -724,11 +741,17 @@ int main(int argc, char *argv[])
 
             if (argv[0][6] == '\0')
                 return print_help();
-            if (env_list_size >= sizeof(env_list) / sizeof(char *))
+            if (env_list_size == env_list_max)
             {
-                printf("Only allow max env number %d\n",
-                       (int)(sizeof(env_list) / sizeof(char *)));
-                return 1;
+                const uint32 new_env_list_max = env_list_max > 0 ? env_list_max * 2 : 8;
+                const char **new_env_list = realloc(env_list, new_env_list_max * sizeof(const char *));
+                if (new_env_list == NULL)
+                {
+                    printf("env_list: realloc failed %u -> %u\n", env_list_max, new_env_list_max);
+                    return 1;
+                }
+                env_list = new_env_list;
+                env_list_max = new_env_list_max;
             }
             tmp_env = argv[0] + 6;
             if (validate_env_str(tmp_env))
@@ -938,17 +961,10 @@ int main(int argc, char *argv[])
         case HC_MAP:
         {
             const struct json_array_s *value = item->value->payload;
-            if ((dir_list_size + value->length) > dir_list_max)
+            if (!reserve(&dir_list, &dir_list_max, dir_list_size + value->length))
             {
-                const uint32 new_dir_list_max = dir_list_size + value->length;
-                const char **new_dir_list = realloc(dir_list, new_dir_list_max * sizeof(const char *));
-                if (new_dir_list == NULL)
-                {
-                    printf("dir_list: realloc failed %u -> %u\n", dir_list_max, new_dir_list_max);
-                    return 1;
-                }
-                dir_list = new_dir_list;
-                dir_list_max = new_dir_list_max;
+                printf("MAP: reserve failed\n");
+                return 1;
             }
             for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
             {
@@ -967,12 +983,10 @@ int main(int argc, char *argv[])
         }
         case HC_ENV_PWD_IS_HOST_CWD:
         {
-            const size_t max_env = sizeof(env_list) / sizeof(env_list[0]);
-            if (env_list_size >= max_env)
+            if (!reserve(&env_list, &env_list_max, env_list_size + 1))
             {
-                free(json);
-                fprintf(stderr, "ENV_PWD_IS_HOST_CWD too many env vars\n");
-                return print_help();
+                printf("ENV_PWD_IS_HOST_CWD: reserve failed\n");
+                return 1;
             }
             char *wd = getcwd(NULL, 0);
             static const char pwd_prefix[] = "PWD=";
@@ -987,12 +1001,10 @@ int main(int argc, char *argv[])
         case HC_ENV:
         {
             const struct json_array_s *value = item->value->payload;
-            const size_t max_env = sizeof(env_list) / sizeof(env_list[0]);
-            if (value->length > (max_env - env_list_size))
+            if (!reserve(&env_list, &env_list_max, env_list_size + value->length + 1))
             {
-                free(json);
-                fprintf(stderr, "ENV too many items\n");
-                return print_help();
+                printf("ENV: reserve failed\n");
+                return 1;
             }
             for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
             {
