@@ -157,7 +157,7 @@ include (${SHARED_DIR}/utils/uncommon/shared_uncommon.cmake)
 
 set(CMAKE_EXECUTABLE_SUFFIX ".com")
 
-add_executable (hermit-base src/main.c ${UNCOMMON_SHARED_SOURCE})
+add_executable (hermit-base src/wamr.c ${UNCOMMON_SHARED_SOURCE})
 set_target_properties (hermit-base PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries (hermit-base vmlib ${LLVM_AVAILABLE_LIBS} ${UV_A_LIBS} ${WASI_NN_LIBS} -lm -ldl -lpthread)
 
