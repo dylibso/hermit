@@ -24,88 +24,10 @@ static char **app_argv;
 
 /* clang-format off */
 static int
-print_help()
+print_help(const char *prog_name)
 {
-    printf("Usage: iwasm [-options] wasm_file [args...]\n");
-    printf("options:\n");
-    printf("  -f|--function name       Specify a function name of the module to run rather\n"
-           "                           than main\n");
-#if WASM_ENABLE_LOG != 0
-    printf("  -v=n                     Set log verbose level (0 to 5, default is 2) larger\n"
-           "                           level with more log\n");
-#endif
-#if WASM_ENABLE_INTERP != 0
-    printf("  --interp                 Run the wasm app with interpreter mode\n");
-#endif
-#if WASM_ENABLE_FAST_JIT != 0
-    printf("  --fast-jit               Run the wasm app with fast jit mode\n");
-#endif
-#if WASM_ENABLE_JIT != 0
-    printf("  --llvm-jit               Run the wasm app with llvm jit mode\n");
-#endif
-#if WASM_ENABLE_JIT != 0 && WASM_ENABLE_FAST_JIT != 0 && WASM_ENABLE_LAZY_JIT != 0
-    printf("  --multi-tier-jit         Run the wasm app with multi-tier jit mode\n");
-#endif
-    printf("  --stack-size=n           Set maximum stack size in bytes, default is 64 KB\n");
-    printf("  --heap-size=n            Set maximum heap size in bytes, default is 16 KB\n");
-#if WASM_ENABLE_FAST_JIT != 0
-    printf("  --jit-codecache-size=n   Set fast jit maximum code cache size in bytes,\n");
-    printf("                           default is %u KB\n", FAST_JIT_DEFAULT_CODE_CACHE_SIZE / 1024);
-#endif
-#if WASM_ENABLE_JIT != 0
-    printf("  --llvm-jit-size-level=n  Set LLVM JIT size level, default is 3\n");
-    printf("  --llvm-jit-opt-level=n   Set LLVM JIT optimization level, default is 3\n");
-#if defined(os_writegsbase)
-    printf("  --enable-segue[=<flags>] Enable using segment register GS as the base address of\n");
-    printf("                           linear memory, which may improve performance, flags can be:\n");
-    printf("                              i32.load, i64.load, f32.load, f64.load, v128.load,\n");
-    printf("                              i32.store, i64.store, f32.store, f64.store, v128.store\n");
-    printf("                           Use comma to separate, e.g. --enable-segue=i32.load,i64.store\n");
-    printf("                           and --enable-segue means all flags are added.\n");
-#endif
-#endif
-    printf("  --repl                   Start a very simple REPL (read-eval-print-loop) mode\n"
-           "                           that runs commands in the form of \"FUNC ARG...\"\n");
-#if WASM_CONFIGUABLE_BOUNDS_CHECKS != 0
-    printf("  --disable-bounds-checks  Disable bounds checks for memory accesses\n");
-#endif
-#if WASM_ENABLE_LIBC_WASI != 0
-    printf("  --env=<env>              Pass wasi environment variables with \"key=value\"\n");
-    printf("                           to the program, for example:\n");
-    printf("                             --env=\"key1=value1\" --env=\"key2=value2\"\n");
-    printf("  --dir=<dir>              Grant wasi access to the given host directories\n");
-    printf("                           to the program, for example:\n");
-    printf("                             --dir=<dir1> --dir=<dir2>\n");
-    printf("  --addr-pool=<addrs>      Grant wasi access to the given network addresses in\n");
-    printf("                           CIRD notation to the program, seperated with ',',\n");
-    printf("                           for example:\n");
-    printf("                             --addr-pool=1.2.3.4/15,2.3.4.5/16\n");
-    printf("  --allow-resolve=<domain> Allow the lookup of the specific domain name or domain\n");
-    printf("                           name suffixes using a wildcard, for example:\n");
-    printf("                           --allow-resolve=example.com # allow the lookup of the specific domain\n");
-    printf("                           --allow-resolve=*.example.com # allow the lookup of all subdomains\n");
-    printf("                           --allow-resolve=* # allow any lookup\n");
-#endif
-#if BH_HAS_DLFCN
-    printf("  --native-lib=<lib>       Register native libraries to the WASM module, which\n");
-    printf("                           are shared object (.so) files, for example:\n");
-    printf("                             --native-lib=test1.so --native-lib=test2.so\n");
-#endif
-#if WASM_ENABLE_MULTI_MODULE != 0
-    printf("  --module-path=<path>     Indicate a module search path. default is current\n"
-           "                           directory('./')\n");
-#endif
-#if WASM_ENABLE_LIB_PTHREAD != 0 || WASM_ENABLE_LIB_WASI_THREADS != 0
-    printf("  --max-threads=n          Set maximum thread number per cluster, default is 4\n");
-#endif
-#if WASM_ENABLE_DEBUG_INTERP != 0
-    printf("  -g=ip:port               Set the debug sever address, default is debug disabled\n");
-    printf("                             if port is 0, then a random port will be used\n");
-#endif
-#if WASM_ENABLE_STATIC_PGO != 0
-    printf("  --gen-prof-file=<path>   Generate LLVM PGO (Profile-Guided Optimization) profile file\n");
-#endif
-    printf("  --version                Show version information\n");
+    printf("usage: %s [args...]\n", prog_name);
+    printf("%s must have hermit.json and main.wasm embedded in its zip filesystem\n", prog_name);
     return 1;
 }
 /* clang-format on */
@@ -131,164 +53,11 @@ app_instance_func(wasm_module_inst_t module_inst, const char *func_name)
     return wasm_runtime_get_exception(module_inst);
 }
 
-/**
- * Split a string into an array of strings
- * Returns NULL on failure
- * Memory must be freed by caller
- * Based on: http://stackoverflow.com/a/11198630/471795
- */
-static char **
-split_string(char *str, int *count, const char *delimer)
-{
-    char **res = NULL, **res1;
-    char *p;
-    int idx = 0;
-
-    /* split string and append tokens to 'res' */
-    do
-    {
-        p = strtok(str, delimer);
-        str = NULL;
-        res1 = res;
-        res = (char **)realloc(res1, sizeof(char *) * (uint32)(idx + 1));
-        if (res == NULL)
-        {
-            free(res1);
-            return NULL;
-        }
-        res[idx++] = p;
-    } while (p);
-
-    /**
-     * Due to the function name,
-     * res[0] might contain a '\' to indicate a space
-     * func\name -> func name
-     */
-    p = strchr(res[0], '\\');
-    while (p)
-    {
-        *p = ' ';
-        p = strchr(p, '\\');
-    }
-
-    if (count)
-    {
-        *count = idx - 1;
-    }
-    return res;
-}
-
-static void *
-app_instance_repl(wasm_module_inst_t module_inst)
-{
-    char *cmd = NULL;
-    size_t len = 0;
-    ssize_t n;
-
-    while ((printf("webassembly> "), fflush(stdout),
-            n = getline(&cmd, &len, stdin)) != -1)
-    {
-        bh_assert(n > 0);
-        if (cmd[n - 1] == '\n')
-        {
-            if (n == 1)
-                continue;
-            else
-                cmd[n - 1] = '\0';
-        }
-        if (!strcmp(cmd, "__exit__"))
-        {
-            printf("exit repl mode\n");
-            break;
-        }
-        app_argv = split_string(cmd, &app_argc, " ");
-        if (app_argv == NULL)
-        {
-            LOG_ERROR("Wasm prepare param failed: split string failed.\n");
-            break;
-        }
-        if (app_argc != 0)
-        {
-            wasm_application_execute_func(module_inst, app_argv[0],
-                                          app_argc - 1, app_argv + 1);
-        }
-        free(app_argv);
-    }
-    free(cmd);
-    return NULL;
-}
-
-#if WASM_ENABLE_JIT != 0
-static uint32
-resolve_segue_flags(char *str_flags)
-{
-    uint32 segue_flags = 0;
-    int32 flag_count, i;
-    char **flag_list;
-
-    flag_list = split_string(str_flags, &flag_count, ",");
-    if (flag_list)
-    {
-        for (i = 0; i < flag_count; i++)
-        {
-            if (!strcmp(flag_list[i], "i32.load"))
-            {
-                segue_flags |= 1 << 0;
-            }
-            else if (!strcmp(flag_list[i], "i64.load"))
-            {
-                segue_flags |= 1 << 1;
-            }
-            else if (!strcmp(flag_list[i], "f32.load"))
-            {
-                segue_flags |= 1 << 2;
-            }
-            else if (!strcmp(flag_list[i], "f64.load"))
-            {
-                segue_flags |= 1 << 3;
-            }
-            else if (!strcmp(flag_list[i], "v128.load"))
-            {
-                segue_flags |= 1 << 4;
-            }
-            else if (!strcmp(flag_list[i], "i32.store"))
-            {
-                segue_flags |= 1 << 8;
-            }
-            else if (!strcmp(flag_list[i], "i64.store"))
-            {
-                segue_flags |= 1 << 9;
-            }
-            else if (!strcmp(flag_list[i], "f32.store"))
-            {
-                segue_flags |= 1 << 10;
-            }
-            else if (!strcmp(flag_list[i], "f64.store"))
-            {
-                segue_flags |= 1 << 11;
-            }
-            else if (!strcmp(flag_list[i], "v128.store"))
-            {
-                segue_flags |= 1 << 12;
-            }
-            else
-            {
-                /* invalid flag */
-                segue_flags = (uint32)-1;
-                break;
-            }
-        }
-        free(flag_list);
-    }
-    return segue_flags;
-}
-#endif /* end of WASM_ENABLE_JIT != 0 */
-
 #if WASM_ENABLE_LIBC_WASI != 0
 static bool
-validate_env_str(char *env)
+validate_env_str(const char *env)
 {
-    char *p = env;
+    const char *p = env;
     int key_len = 0;
 
     while (*p != '\0' && *p != '=')
@@ -489,13 +258,6 @@ dump_pgo_prof_data(wasm_module_inst_t module_inst, const char *path)
 }
 #endif
 
-static bool
-is_string(const char *sz_string, const char bytes[], const size_t num_bytes)
-{
-    const size_t sz_len = strlen(sz_string);
-    return (sz_len == num_bytes) && (memcmp(sz_string, bytes, num_bytes) == 0);
-}
-
 static const char *get_json_type_name(const json_type_t t)
 {
 #define X(name)       \
@@ -562,7 +324,6 @@ int main(int argc, char *argv[])
 #if WASM_ENABLE_LOG != 0
     int log_verbose_level = 2;
 #endif
-    bool is_repl_mode = false;
     bool is_xip_file = false;
 #if WASM_CONFIGUABLE_BOUNDS_CHECKS != 0
     bool disable_bounds_checks = false;
@@ -593,323 +354,47 @@ int main(int argc, char *argv[])
     const char *gen_prof_file = NULL;
 #endif
 
-    /* Process options. */
-    for (argc--, argv++; argc > 0 && argv[0][0] == '-'; argc--, argv++)
-    {
-        if (!strcmp(argv[0], "-f") || !strcmp(argv[0], "--function"))
-        {
-            argc--, argv++;
-            if (argc < 2)
-            {
-                return print_help();
-            }
-            func_name = argv[0];
-        }
-#if WASM_ENABLE_INTERP != 0
-        else if (!strcmp(argv[0], "--interp"))
-        {
-            running_mode = Mode_Interp;
-        }
-#endif
-#if WASM_ENABLE_FAST_JIT != 0
-        else if (!strcmp(argv[0], "--fast-jit"))
-        {
-            running_mode = Mode_Fast_JIT;
-        }
-#endif
-#if WASM_ENABLE_JIT != 0
-        else if (!strcmp(argv[0], "--llvm-jit"))
-        {
-            running_mode = Mode_LLVM_JIT;
-        }
-#endif
-#if WASM_ENABLE_JIT != 0 && WASM_ENABLE_FAST_JIT != 0 && WASM_ENABLE_LAZY_JIT != 0
-        else if (!strcmp(argv[0], "--multi-tier-jit"))
-        {
-            running_mode = Mode_Multi_Tier_JIT;
-        }
-#endif
-#if WASM_ENABLE_LOG != 0
-        else if (!strncmp(argv[0], "-v=", 3))
-        {
-            log_verbose_level = atoi(argv[0] + 3);
-            if (log_verbose_level < 0 || log_verbose_level > 5)
-                return print_help();
-        }
-#endif
-        else if (!strcmp(argv[0], "--repl"))
-        {
-            is_repl_mode = true;
-        }
-#if WASM_CONFIGUABLE_BOUNDS_CHECKS != 0
-        else if (!strcmp(argv[0], "--disable-bounds-checks"))
-        {
-            disable_bounds_checks = true;
-        }
-#endif
-        else if (!strncmp(argv[0], "--stack-size=", 13))
-        {
-            if (argv[0][13] == '\0')
-                return print_help();
-            stack_size = atoi(argv[0] + 13);
-        }
-        else if (!strncmp(argv[0], "--heap-size=", 12))
-        {
-            if (argv[0][12] == '\0')
-                return print_help();
-            heap_size = atoi(argv[0] + 12);
-        }
-#if WASM_ENABLE_FAST_JIT != 0
-        else if (!strncmp(argv[0], "--jit-codecache-size=", 21))
-        {
-            if (argv[0][21] == '\0')
-                return print_help();
-            jit_code_cache_size = atoi(argv[0] + 21);
-        }
-#endif
-#if WASM_ENABLE_JIT != 0
-        else if (!strncmp(argv[0], "--llvm-jit-size-level=", 22))
-        {
-            if (argv[0][22] == '\0')
-                return print_help();
-            llvm_jit_size_level = atoi(argv[0] + 22);
-            if (llvm_jit_size_level < 1)
-            {
-                printf("LLVM JIT size level shouldn't be smaller than 1, "
-                       "setting it to 1\n");
-                llvm_jit_size_level = 1;
-            }
-            else if (llvm_jit_size_level > 3)
-            {
-                printf("LLVM JIT size level shouldn't be greater than 3, "
-                       "setting it to 3\n");
-                llvm_jit_size_level = 3;
-            }
-        }
-        else if (!strncmp(argv[0], "--llvm-jit-opt-level=", 21))
-        {
-            if (argv[0][21] == '\0')
-                return print_help();
-            llvm_jit_opt_level = atoi(argv[0] + 21);
-            if (llvm_jit_opt_level < 1)
-            {
-                printf("LLVM JIT opt level shouldn't be smaller than 1, "
-                       "setting it to 1\n");
-                llvm_jit_opt_level = 1;
-            }
-            else if (llvm_jit_opt_level > 3)
-            {
-                printf("LLVM JIT opt level shouldn't be greater than 3, "
-                       "setting it to 3\n");
-                llvm_jit_opt_level = 3;
-            }
-        }
-        else if (!strcmp(argv[0], "--enable-segue"))
-        {
-            /* all flags are enabled */
-            segue_flags = 0x1F1F;
-        }
-        else if (!strncmp(argv[0], "--enable-segue=", 15))
-        {
-            segue_flags = resolve_segue_flags(argv[0] + 15);
-            if (segue_flags == (uint32)-1)
-                return print_help();
-        }
-#endif /* end of WASM_ENABLE_JIT != 0 */
-#if WASM_ENABLE_LIBC_WASI != 0
-        else if (!strncmp(argv[0], "--dir=", 6))
-        {
-            if (argv[0][6] == '\0')
-                return print_help();
-            if (dir_list_size == dir_list_max)
-            {
-                const uint32 new_dir_list_max = dir_list_max > 0 ? dir_list_max * 2 : 8;
-                const char **new_dir_list = realloc(dir_list, new_dir_list_max * sizeof(const char *));
-                if (new_dir_list == NULL)
-                {
-                    printf("dir_list: realloc failed %u -> %u\n", dir_list_max, new_dir_list_max);
-                    return 1;
-                }
-                dir_list = new_dir_list;
-                dir_list_max = new_dir_list_max;
-            }
-            dir_list[dir_list_size++] = argv[0] + 6;
-        }
-        else if (!strncmp(argv[0], "--env=", 6))
-        {
-            char *tmp_env;
-
-            if (argv[0][6] == '\0')
-                return print_help();
-            if (env_list_size == env_list_max)
-            {
-                const uint32 new_env_list_max = env_list_max > 0 ? env_list_max * 2 : 8;
-                const char **new_env_list = realloc(env_list, new_env_list_max * sizeof(const char *));
-                if (new_env_list == NULL)
-                {
-                    printf("env_list: realloc failed %u -> %u\n", env_list_max, new_env_list_max);
-                    return 1;
-                }
-                env_list = new_env_list;
-                env_list_max = new_env_list_max;
-            }
-            tmp_env = argv[0] + 6;
-            if (validate_env_str(tmp_env))
-                env_list[env_list_size++] = tmp_env;
-            else
-            {
-                printf("Wasm parse env string failed: expect \"key=value\", "
-                       "got \"%s\"\n",
-                       tmp_env);
-                return print_help();
-            }
-        }
-        /* TODO: parse the configuration file via --addr-pool-file */
-        else if (!strncmp(argv[0], "--addr-pool=", strlen("--addr-pool=")))
-        {
-            /* like: --addr-pool=100.200.244.255/30 */
-            char *token = NULL;
-
-            if ('\0' == argv[0][12])
-                return print_help();
-
-            token = strtok(argv[0] + strlen("--addr-pool="), ",");
-            while (token)
-            {
-                if (addr_pool_size >= sizeof(addr_pool) / sizeof(char *))
-                {
-                    printf("Only allow max address number %d\n",
-                           (int)(sizeof(addr_pool) / sizeof(char *)));
-                    return 1;
-                }
-
-                addr_pool[addr_pool_size++] = token;
-                token = strtok(NULL, ";");
-            }
-        }
-        else if (!strncmp(argv[0], "--allow-resolve=", 16))
-        {
-            if (argv[0][16] == '\0')
-                return print_help();
-            if (ns_lookup_pool_size >= sizeof(ns_lookup_pool) / sizeof(ns_lookup_pool[0]))
-            {
-                printf(
-                    "Only allow max ns lookup number %d\n",
-                    (int)(sizeof(ns_lookup_pool) / sizeof(ns_lookup_pool[0])));
-                return 1;
-            }
-            ns_lookup_pool[ns_lookup_pool_size++] = argv[0] + 16;
-        }
-#endif /* WASM_ENABLE_LIBC_WASI */
-#if BH_HAS_DLFCN
-        else if (!strncmp(argv[0], "--native-lib=", 13))
-        {
-            if (argv[0][13] == '\0')
-                return print_help();
-            if (native_lib_count >= sizeof(native_lib_list) / sizeof(char *))
-            {
-                printf("Only allow max native lib number %d\n",
-                       (int)(sizeof(native_lib_list) / sizeof(char *)));
-                return 1;
-            }
-            native_lib_list[native_lib_count++] = argv[0] + 13;
-        }
-#endif
-#if WASM_ENABLE_MULTI_MODULE != 0
-        else if (!strncmp(argv[0],
-                          "--module-path=", strlen("--module-path=")))
-        {
-            module_search_path = handle_module_path(argv[0]);
-            if (!strlen(module_search_path))
-            {
-                return print_help();
-            }
-        }
-#endif
-#if WASM_ENABLE_LIB_PTHREAD != 0 || WASM_ENABLE_LIB_WASI_THREADS != 0
-        else if (!strncmp(argv[0], "--max-threads=", 14))
-        {
-            if (argv[0][14] == '\0')
-                return print_help();
-            wasm_runtime_set_max_thread_num(atoi(argv[0] + 14));
-        }
-#endif
-#if WASM_ENABLE_DEBUG_INTERP != 0
-        else if (!strncmp(argv[0], "-g=", 3))
-        {
-            char *port_str = strchr(argv[0] + 3, ':');
-            char *port_end;
-            if (port_str == NULL)
-                return print_help();
-            *port_str = '\0';
-            instance_port = strtoul(port_str + 1, &port_end, 10);
-            if (port_str[1] == '\0' || *port_end != '\0')
-                return print_help();
-            ip_addr = argv[0] + 3;
-        }
-#endif
-#if WASM_ENABLE_STATIC_PGO != 0
-        else if (!strncmp(argv[0], "--gen-prof-file=", 16))
-        {
-            if (argv[0][16] == '\0')
-                return print_help();
-            gen_prof_file = argv[0] + 16;
-        }
-#endif
-        else if (!strncmp(argv[0], "--version", 9))
-        {
-            uint32 major, minor, patch;
-            wasm_runtime_get_version(&major, &minor, &patch);
-            printf("iwasm %" PRIu32 ".%" PRIu32 ".%" PRIu32 "\n", major, minor,
-                   patch);
-            return 0;
-        }
-        else
-            return print_help();
-    }
-
-    // if (argc == 0)
-    //     return print_help();
+    // load hermit configuration
     FILE *json_file = fopen("/zip/hermit.json", "rb");
     if (json_file == NULL)
     {
-        return print_help();
+        return print_help(argv[0]);
     }
     if (fseek(json_file, 0, SEEK_END) != 0)
     {
         fclose(json_file);
-        return print_help();
+        return print_help(argv[0]);
     }
     const int size = ftell(json_file);
     if (size < 0)
     {
         fclose(json_file);
-        return print_help();
+        return print_help(argv[0]);
     }
     rewind(json_file);
     char *json_bytes = malloc(size);
     if (json_bytes == NULL)
     {
         fclose(json_file);
-        return print_help();
+        return print_help(argv[0]);
     }
     const int fread_status = fread(json_bytes, size, 1, json_file);
     fclose(json_file);
     if (fread_status != 1)
     {
         free(json_bytes);
-        return print_help();
+        return print_help(argv[0]);
     }
     struct json_value_s *json = json_parse(json_bytes, size);
     free(json_bytes);
     if (json == NULL)
     {
-        return print_help();
+        return print_help(argv[0]);
     }
     if (json->type != json_type_object)
     {
         free(json);
-        return print_help();
+        return print_help(argv[0]);
     }
     const struct json_object_s *object = json->payload;
     typedef enum
@@ -944,13 +429,13 @@ int main(int argc, char *argv[])
         hermit_config_index config_index = HC_UNKNOWN;
         for (size_t i = 0; i < sizeof(items) / sizeof(items[0]); i++)
         {
-            if (is_string(items[i].key, name->string, name->string_size))
+            if (strcmp(items[i].key, name->string) == 0)
             {
                 if (items[i].type != item->value->type)
                 {
                     free(json);
                     fprintf(stderr, "%s: expected %s got %s!\n", items[i].key, get_json_type_name(items[i].type), get_json_type_name(item->value->type));
-                    return print_help();
+                    return print_help(argv[0]);
                 }
                 config_index = items[i].index;
                 break;
@@ -972,7 +457,7 @@ int main(int argc, char *argv[])
                 {
                     free(json);
                     fprintf(stderr, "MAP must be an array of strings\n");
-                    return print_help();
+                    return print_help(argv[0]);
                 }
                 const struct json_string_s *string = aitem->value->payload;
                 char *dir_item = malloc(string->string_size + 1);
@@ -1012,9 +497,16 @@ int main(int argc, char *argv[])
                 {
                     free(json);
                     fprintf(stderr, "ENV must be an array of strings\n");
-                    return print_help();
+                    return print_help(argv[0]);
                 }
                 const struct json_string_s *string = aitem->value->payload;
+                if (!validate_env_str(string->string))
+                {
+                    fprintf(stderr, "ENV: parse env string failed: expect \"key=value\", "
+                                    "got \"%s\"\n",
+                            string->string);
+                    return print_help(argv[0]);
+                }
                 char *env_item = malloc(string->string_size + 1);
                 memcpy(env_item, string->string, string->string_size + 1);
                 env_list[env_list_size++] = env_item;
@@ -1037,13 +529,12 @@ int main(int argc, char *argv[])
         fprintf(stderr, "hermit_loader: %s key: %.*s\n", ((config_index != HC_UNKNOWN) ? "found" : "unknown"), (int)name->string_size, name->string);
     }
     free(json);
-    app_argc = argc + 1;
+
+    // setup args
+    app_argc = argc >= 1 ? argc : 1;
     app_argv = malloc((app_argc + 1) * sizeof(char *));
     app_argv[0] = "/zip/main.wasm";
-    for (int i = 0; i < argc; i++)
-    {
-        app_argv[i + 1] = argv[i];
-    }
+    memcpy(&app_argv[1], &argv[1], sizeof(char *) * (argc - 1));
     app_argv[app_argc] = NULL;
     wasm_file = app_argv[0];
     argv = app_argv;
@@ -1181,11 +672,7 @@ int main(int argc, char *argv[])
 #endif
 
     ret = 0;
-    if (is_repl_mode)
-    {
-        app_instance_repl(wasm_module_inst);
-    }
-    else if (func_name)
+    if (func_name)
     {
         if (app_instance_func(wasm_module_inst, func_name))
         {
