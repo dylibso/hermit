@@ -1,13 +1,26 @@
 use dockerfile_parser::{Dockerfile, Instruction};
+use serde::Serialize;
+use serde_json;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize)]
 struct Hermitfile {
+    #[serde(rename = "FROM")]
     pub from: String,
+    #[serde(rename = "LINK")]
     pub link: Vec<String>,
+    #[serde(rename = "MAP")]
     pub map: Vec<[String; 2]>,
+    #[serde(rename = "NET")]
     pub net: Vec<String>,
+    #[serde(rename = "ENTRYPOINT")]
     pub entrypoint: Vec<String>,
+    #[serde(rename = "ENV_PWD_IS_HOST_CWD")]
+    pub uses_host_cwd: bool,
+    #[serde(rename = "ENV_EXE_NAME_IS_HOST_EXE_NAME")]
+    pub uses_host_exe_name: bool,
 }
+
+// shoud have a library function exported to take a file path where the Hermitfile is located. this is then open & read via WASI calls, to be parsed into the Hermitfile struct and returned as JSON to the caller
 
 fn main() {
     let dockerfile = Dockerfile::parse(
@@ -24,6 +37,10 @@ NET ['*.github.com', 'api.reddit.com', 'localhost:6379']
 
 # ENV USER=
 # ENV NAME=
+
+ENV_PWD_IS_HOST_CWD
+        
+ENV_EXE_NAME_IS_HOST_EXE_NAME
         
 # configure which function to call on startup
 ENTRYPOINT ["count_vowels", "this is a test" ]
@@ -69,9 +86,14 @@ ENTRYPOINT ["count_vowels", "this is a test" ]
                         arr.elements.iter().cloned().map(|s| s.content).collect();
                 }
             }
+            Instruction::EnvPwdIsHostCwd(_) => hermitfile.uses_host_cwd = true,
+            Instruction::EnvExeIsHostCwd(_) => hermitfile.uses_host_exe_name = true,
             _ => {}
         }
     }
 
-    println!("{:#?}", hermitfile);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&hermitfile).expect("json serialized")
+    )
 }
