@@ -5,16 +5,11 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-<<<<<<< HEAD
 [lib]
 crate-type = ["cdylib"]
 path = "src/main.rs"
 
 [dependencies]
 dockerfile-parser = { git = "https://github.com/dylibso/dockerfile-parser-rs", branch = "hermitfile-adaptation" }
-serde = {version = "1.0.188", features = ["derive"] }
+serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
-=======
-[dependencies]
-dockerfile-parser = { path = "../../../dockerfile-parser-rs" }
->>>>>>> b294e83 (feat: wip hermitfile parser based on dockerfile parser)
