@@ -16,8 +16,8 @@
 static int
 print_help(const char *prog_name)
 {
-    printf("usage: %s [args...]\n", prog_name);
-    printf("%s must have hermit.json and main.wasm embedded in its zip filesystem\n", prog_name);
+    fprintf(stderr, "usage: %s [args...]\n", prog_name);
+    fprintf(stderr, "%s must have hermit.json and main.wasm embedded in its zip filesystem\n", prog_name);
     return 1;
 }
 /* clang-format on */
@@ -51,7 +51,7 @@ static bool reserve(const char ***list, uint32_t *list_capacity, const uint32_t 
     const char **new_list = realloc(*list, new_capacity * sizeof(const char *));
     if (new_list == NULL)
     {
-        printf("%s: realloc failed %u -> %u\n", __func__, *list_capacity, new_capacity);
+        fprintf(stderr, "%s: realloc failed %u -> %u\n", __func__, *list_capacity, new_capacity);
         return false;
     }
     *list = new_list;
@@ -59,9 +59,92 @@ static bool reserve(const char ***list, uint32_t *list_capacity, const uint32_t 
     return true;
 }
 
+// strdup for mem
+static void *memdup(const void *src, const size_t size)
+{
+    void *dest = malloc(size);
+    if (dest)
+    {
+        memcpy(dest, src, size);
+    }
+    return dest;
+}
+
+#define defer(fn) __attribute__((cleanup(fn)))
+
+void cleanup_free(void *p)
+{
+    void **tofree = (void **)p;
+    if (*tofree == NULL)
+    {
+        return;
+    }
+    free(*tofree);
+}
+#define defer_free defer(cleanup_free)
+
+void cleanup_close(FILE **fp)
+{
+    if (*fp == NULL)
+    {
+        return;
+    }
+    fclose(*fp);
+}
+#define defer_close defer(cleanup_close)
+
 int main(int argc, char *argv[])
 {
-    // load hermit configuration
+    defer_free struct json_value_s *json = NULL;
+    {
+        defer_free char *json_bytes = NULL;
+        int size;
+        {
+            static const char *hermit_json_path = "/zip/hermit.json";
+            defer_close FILE *json_file = fopen(hermit_json_path, "rb");
+            if (json_file == NULL)
+            {
+                fprintf(stderr, "error opening %s\n", hermit_json_path);
+                return 1;
+            }
+            if (fseek(json_file, 0, SEEK_END) != 0)
+            {
+                fprintf(stderr, "error seeking on %s\n", hermit_json_path);
+                return 1;
+            }
+            size = ftell(json_file);
+            if (size < 0)
+            {
+                fprintf(stderr, "error ftell on %s\n", hermit_json_path);
+                return 1;
+            }
+            rewind(json_file);
+            json_bytes = malloc(size);
+            if (json_bytes == NULL)
+            {
+                fprintf(stderr, "error malloc(%d)\n", size);
+                return 1;
+            }
+            const int fread_status = fread(json_bytes, size, 1, json_file);
+            if (fread_status != 1)
+            {
+                fprintf(stderr, "error fread on %s\n", hermit_json_path);
+                return 1;
+            }
+        }
+        json = json_parse(json_bytes, size);
+    }
+    if (json == NULL)
+    {
+        fprintf(stderr, "error parsing json\n");
+        return 1;
+    }
+    if (json->type != json_type_object)
+    {
+        fprintf(stderr, "error json should consist of an object\n");
+        return 1;
+    }
+
     const char **dir_list = NULL;
     uint32_t dir_list_max = 0;
     uint32_t dir_list_size = 0;
@@ -69,47 +152,7 @@ int main(int argc, char *argv[])
     uint32_t env_list_max = 0;
     uint32_t env_list_size = 0;
     const char *func_name = NULL;
-    FILE *json_file = fopen("/zip/hermit.json", "rb");
-    if (json_file == NULL)
-    {
-        return print_help(argv[0]);
-    }
-    if (fseek(json_file, 0, SEEK_END) != 0)
-    {
-        fclose(json_file);
-        return print_help(argv[0]);
-    }
-    const int size = ftell(json_file);
-    if (size < 0)
-    {
-        fclose(json_file);
-        return print_help(argv[0]);
-    }
-    rewind(json_file);
-    char *json_bytes = malloc(size);
-    if (json_bytes == NULL)
-    {
-        fclose(json_file);
-        return print_help(argv[0]);
-    }
-    const int fread_status = fread(json_bytes, size, 1, json_file);
-    fclose(json_file);
-    if (fread_status != 1)
-    {
-        free(json_bytes);
-        return print_help(argv[0]);
-    }
-    struct json_value_s *json = json_parse(json_bytes, size);
-    free(json_bytes);
-    if (json == NULL)
-    {
-        return print_help(argv[0]);
-    }
-    if (json->type != json_type_object)
-    {
-        free(json);
-        return print_help(argv[0]);
-    }
+
     const struct json_object_s *object = json->payload;
     typedef enum
     {
@@ -162,7 +205,7 @@ int main(int argc, char *argv[])
             const struct json_array_s *value = item->value->payload;
             if (!reserve(&dir_list, &dir_list_max, dir_list_size + value->length))
             {
-                printf("MAP: reserve failed\n");
+                fprintf(stderr, "MAP: reserve failed\n");
                 return 1;
             }
             for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
@@ -174,8 +217,12 @@ int main(int argc, char *argv[])
                     return print_help(argv[0]);
                 }
                 const struct json_string_s *string = aitem->value->payload;
-                char *dir_item = malloc(string->string_size + 1);
-                memcpy(dir_item, string->string, string->string_size + 1);
+                char *dir_item = memdup(string->string, string->string_size + 1);
+                if (!dir_item)
+                {
+                    fprintf(stderr, "MAP: malloc failed\n");
+                    return 1;
+                }
                 dir_list[dir_list_size++] = dir_item;
             }
             break;
@@ -184,7 +231,7 @@ int main(int argc, char *argv[])
         {
             if (!reserve(&env_list, &env_list_max, env_list_size + 1))
             {
-                printf("ENV_PWD_IS_HOST_CWD: reserve failed\n");
+                fprintf(stderr, "ENV_PWD_IS_HOST_CWD: reserve failed\n");
                 return 1;
             }
             char *wd = getcwd(NULL, 0);
@@ -192,6 +239,11 @@ int main(int argc, char *argv[])
             const size_t wd_len = strlen(wd);
             const size_t pwd_size = sizeof(pwd_prefix) + wd_len;
             char *pwd = malloc(pwd_size);
+            if (!pwd)
+            {
+                fprintf(stderr, "ENV_PWD_IS_HOST_CWD: malloc failed\n");
+                return 1;
+            }
             memcpy(mempcpy(pwd, pwd_prefix, sizeof(pwd_prefix) - 1), wd, wd_len + 1);
             free(wd);
             env_list[env_list_size++] = pwd;
@@ -202,7 +254,7 @@ int main(int argc, char *argv[])
             const struct json_array_s *value = item->value->payload;
             if (!reserve(&env_list, &env_list_max, env_list_size + value->length + 1))
             {
-                printf("ENV: reserve failed\n");
+                fprintf(stderr, "ENV: reserve failed\n");
                 return 1;
             }
             for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
@@ -221,8 +273,12 @@ int main(int argc, char *argv[])
                             string->string);
                     return print_help(argv[0]);
                 }
-                char *env_item = malloc(string->string_size + 1);
-                memcpy(env_item, string->string, string->string_size + 1);
+                char *env_item = memdup(string->string, string->string_size + 1);
+                if (!env_item)
+                {
+                    fprintf(stderr, "ENV: memdup failed\n");
+                    return 1;
+                }
                 env_list[env_list_size++] = env_item;
             }
             break;
@@ -230,9 +286,12 @@ int main(int argc, char *argv[])
         case HC_ENTRYPOINT:
         {
             const struct json_string_s *value = item->value->payload;
-            char *temp_func = malloc(value->string_size + 1);
-            memcpy(temp_func, value->string, value->string_size + 1);
-            func_name = temp_func;
+            func_name = memdup(value->string, value->string_size + 1);
+            if (!func_name)
+            {
+                fprintf(stderr, "ENTRYPOINT: memdup failed\n");
+                return 1;
+            }
             break;
         }
         case HC_UNKNOWN:
