@@ -33,19 +33,26 @@ static const char *get_json_type_name(const json_type_t t)
 #undef X
 }
 
-// similar to C++ vector reserve
-static bool reserve(char ***list, uint32_t *list_capacity, const uint32_t new_capacity)
+typedef struct
 {
-    if (*list_capacity >= new_capacity)
+    char **arr;
+    uint32_t max;
+    uint32_t size;
+} list;
+
+// similar to C++ vector reserve
+static bool list_reserve(list *l, const uint32_t new_capacity)
+{
+    if (l->max >= new_capacity)
         return true;
-    char **new_list = realloc(*list, new_capacity * sizeof(const char *));
+    char **new_list = realloc(l->arr, new_capacity * sizeof(const char *));
     if (new_list == NULL)
     {
-        fprintf(stderr, "%s: realloc failed %u -> %u\n", __func__, *list_capacity, new_capacity);
+        fprintf(stderr, "%s: realloc failed %u -> %u\n", __func__, l->max, new_capacity);
         return false;
     }
-    *list = new_list;
-    *list_capacity = new_capacity;
+    l->arr = new_list;
+    l->max = new_capacity;
     return true;
 }
 
@@ -83,16 +90,24 @@ void cleanup_close(FILE **fp)
 }
 #define defer_close defer(cleanup_close)
 
+void cleanup_list(list *l)
+{
+    if (l->arr)
+    {
+        for (uint32_t i = 0; i < l->size; i++)
+        {
+            free(l->arr[i]);
+        }
+        free(l->arr);
+    }
+}
+#define defer_list defer(cleanup_list)
+
 int main(int argc, char *argv[])
 {
-    char **dir_list = NULL;
-    uint32_t dir_list_max = 0;
-    uint32_t dir_list_size = 0;
-    char **env_list = NULL;
-    uint32_t env_list_max = 0;
-    uint32_t env_list_size = 0;
-    char *func_name = NULL;
-    int ret = 1;
+    defer_list list dir_list = {0};
+    defer_list list env_list = {0};
+    defer_free char *func_name = NULL;
     {
         defer_free struct json_value_s *json = NULL;
         {
@@ -182,7 +197,7 @@ int main(int argc, char *argv[])
                     if (items[i].type != item->value->type)
                     {
                         fprintf(stderr, "%s: expected %s got %s!\n", items[i].key, get_json_type_name(items[i].type), get_json_type_name(item->value->type));
-                        goto main_cleanup;
+                        return 1;
                     }
                     config_index = items[i].index;
                     break;
@@ -193,35 +208,35 @@ int main(int argc, char *argv[])
             case HC_MAP:
             {
                 const struct json_array_s *value = item->value->payload;
-                if (!reserve(&dir_list, &dir_list_max, dir_list_size + value->length))
+                if (!list_reserve(&dir_list, dir_list.size + value->length))
                 {
-                    fprintf(stderr, "MAP: reserve failed\n");
-                    goto main_cleanup;
+                    fprintf(stderr, "MAP: list_reserve failed\n");
+                    return 1;
                 }
                 for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
                 {
                     if (aitem->value->type != json_type_string)
                     {
                         fprintf(stderr, "MAP must be an array of strings\n");
-                        goto main_cleanup;
+                        return 1;
                     }
                     const struct json_string_s *string = aitem->value->payload;
                     char *dir_item = memdup(string->string, string->string_size + 1);
                     if (!dir_item)
                     {
                         fprintf(stderr, "MAP: malloc failed\n");
-                        goto main_cleanup;
+                        return 1;
                     }
-                    dir_list[dir_list_size++] = dir_item;
+                    dir_list.arr[dir_list.size++] = dir_item;
                 }
                 break;
             }
             case HC_ENV_PWD_IS_HOST_CWD:
             {
-                if (!reserve(&env_list, &env_list_max, env_list_size + 1))
+                if (!list_reserve(&env_list, env_list.size + 1))
                 {
-                    fprintf(stderr, "ENV_PWD_IS_HOST_CWD: reserve failed\n");
-                    goto main_cleanup;
+                    fprintf(stderr, "ENV_PWD_IS_HOST_CWD: list_reserve failed\n");
+                    return 1;
                 }
                 defer_free char *wd = getcwd(NULL, 0);
                 static const char pwd_prefix[] = "PWD=";
@@ -231,26 +246,26 @@ int main(int argc, char *argv[])
                 if (!pwd)
                 {
                     fprintf(stderr, "ENV_PWD_IS_HOST_CWD: malloc failed\n");
-                    goto main_cleanup;
+                    return 1;
                 }
                 memcpy(mempcpy(pwd, pwd_prefix, sizeof(pwd_prefix) - 1), wd, wd_len + 1);
-                env_list[env_list_size++] = pwd;
+                env_list.arr[env_list.size++] = pwd;
                 break;
             }
             case HC_ENV:
             {
                 const struct json_array_s *value = item->value->payload;
-                if (!reserve(&env_list, &env_list_max, env_list_size + value->length + 1))
+                if (!list_reserve(&env_list, env_list.size + value->length + 1))
                 {
-                    fprintf(stderr, "ENV: reserve failed\n");
-                    goto main_cleanup;
+                    fprintf(stderr, "ENV: list_reserve failed\n");
+                    return 1;
                 }
                 for (const struct json_array_element_s *aitem = value->start; aitem != NULL; aitem = aitem->next)
                 {
                     if (aitem->value->type != json_type_string)
                     {
                         fprintf(stderr, "ENV must be an array of strings\n");
-                        goto main_cleanup;
+                        return 1;
                     }
                     const struct json_string_s *string = aitem->value->payload;
                     if (!validate_env_str(string->string))
@@ -258,15 +273,15 @@ int main(int argc, char *argv[])
                         fprintf(stderr, "ENV: parse env string failed: expect \"key=value\", "
                                         "got \"%s\"\n",
                                 string->string);
-                        goto main_cleanup;
+                        return 1;
                     }
                     char *env_item = memdup(string->string, string->string_size + 1);
                     if (!env_item)
                     {
                         fprintf(stderr, "ENV: memdup failed\n");
-                        goto main_cleanup;
+                        return 1;
                     }
-                    env_list[env_list_size++] = env_item;
+                    env_list.arr[env_list.size++] = env_item;
                 }
                 break;
             }
@@ -277,7 +292,7 @@ int main(int argc, char *argv[])
                 if (!func_name)
                 {
                     fprintf(stderr, "ENTRYPOINT: memdup failed\n");
-                    goto main_cleanup;
+                    return 1;
                 }
                 break;
             }
@@ -288,41 +303,16 @@ int main(int argc, char *argv[])
             }
             fprintf(stderr, "hermit_loader: %s key: %.*s\n", ((config_index != HC_UNKNOWN) ? "found" : "unknown"), (int)name->string_size, name->string);
         }
-        ret = 0;
     }
 
-    {
-        // setup args
-        int app_argc = argc >= 1 ? argc : 1;
-        defer_free char **app_argv = malloc((app_argc + 1) * sizeof(char *));
-        app_argv[0] = "/zip/main.wasm";
-        memcpy(&app_argv[1], &argv[1], sizeof(char *) * (argc - 1));
-        app_argv[app_argc] = NULL;
-        const char *wasm_file = app_argv[0];
+    // setup args
+    int app_argc = argc >= 1 ? argc : 1;
+    defer_free char **app_argv = malloc((app_argc + 1) * sizeof(char *));
+    app_argv[0] = "/zip/main.wasm";
+    memcpy(&app_argv[1], &argv[1], sizeof(char *) * (argc - 1));
+    app_argv[app_argc] = NULL;
+    const char *wasm_file = app_argv[0];
 
-        // WAMR backend using wasm_runtime_api
-        ret = wamr(wasm_file, app_argc, app_argv, dir_list, dir_list_size, env_list, env_list_size, func_name);
-    }
-main_cleanup:
-    if (func_name)
-    {
-        free(func_name);
-    }
-    if (dir_list)
-    {
-        for (uint32_t i = 0; i < dir_list_size; i++)
-        {
-            free(dir_list[i]);
-        }
-        free(dir_list);
-    }
-    if (env_list)
-    {
-        for (uint32_t i = 0; i < env_list_size; i++)
-        {
-            free(env_list[i]);
-        }
-        free(env_list);
-    }
-    return ret;
+    // WAMR backend using wasm_runtime_api
+    return wamr(wasm_file, app_argc, app_argv, dir_list.arr, dir_list.size, env_list.arr, env_list.size, func_name);
 }
