@@ -26,16 +26,12 @@ struct Hermitfile {
     pub uses_host_exe_name: bool,
 }
 
-// shoud have a library function exported to take a file path where the Hermitfile is located. this is then open & read via WASI calls, to be parsed into the Hermitfile struct and returned as JSON to the caller
-#[no_mangle]
-pub extern "C" fn parse_hermitfile(ptr: *mut u8, len: u32) {
+// TODO: originally wrote this to be exported to Wasm, and called as a library function, hence the
+// signature. Consider using &str instead.
+fn parse_hermitfile(ptr: *mut u8, len: u32) {
     let hermitfile_path = unsafe { String::from_raw_parts(ptr, len as usize, len as usize) };
-
     let file = std::fs::read(&hermitfile_path).unwrap_or_default();
     let dockerfile = String::from_utf8(file).unwrap_or_default();
-
-    println!("{}", dockerfile);
-
     let hf = Dockerfile::parse(&dockerfile).unwrap();
 
     let mut hermitfile = Hermitfile::default();
@@ -100,11 +96,38 @@ pub extern "C" fn parse_hermitfile(ptr: *mut u8, len: u32) {
     )
 }
 
-fn main() {
-    const hermitfile_path: &str = "Hermitfile";
+fn get_hermitfile_path() -> String {
+    let mut hermitfile_path = "Hermitfile".to_string();
 
+    let mut use_next = false;
+    let args = Box::new(std::env::args());
+    for arg in args {
+        if use_next {
+            hermitfile_path = arg.to_string();
+            continue;
+        }
+
+        if arg == "-f" {
+            use_next = true;
+        }
+
+        if arg.starts_with("-f=") {
+            let parts = arg.split("=").collect::<Vec<&str>>();
+            if parts.len() != 2 {
+                continue;
+            }
+
+            hermitfile_path = parts[1].to_string();
+        }
+    }
+
+    hermitfile_path
+}
+
+fn main() {
+    let hermitfile_path = get_hermitfile_path();
     parse_hermitfile(
         hermitfile_path.as_ptr() as *mut u8,
         hermitfile_path.len() as u32,
-    )
+    );
 }
