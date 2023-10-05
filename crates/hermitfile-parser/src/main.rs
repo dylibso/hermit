@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use dockerfile_parser::{Dockerfile, Instruction};
 use serde::Serialize;
 use serde_json;
+use std::io::Read;
+use std::io::Write;
 
 #[derive(Debug, Default, Serialize)]
 struct Hermitfile {
@@ -93,7 +95,37 @@ fn parse_hermitfile(ptr: *mut u8, len: u32) {
     println!(
         "{}",
         serde_json::to_string_pretty(&hermitfile).expect("json serialized")
-    )
+    );
+
+    // load executable to use as the hermit
+    let input_exe_name = std::env::var("EXE_NAME").unwrap();
+    let (input_exe, input_perms) = {
+        let input_exe_size: usize = {
+            let input_exe_file = std::fs::File::open(&input_exe_name).unwrap();
+            let mut input_exe_zip = zip::ZipArchive::new(input_exe_file).unwrap();
+            // HACK .offset() doesn't appear to work
+            // instead use the offset of the first file header
+            let first_file_offset = input_exe_zip.by_index(0).unwrap().header_start();
+            first_file_offset.try_into().unwrap()
+        };
+        let mut input_exe: Vec<u8> = vec![0; input_exe_size];
+        let mut input_exe_file = std::fs::File::open(input_exe_name).unwrap();
+        input_exe_file.read_exact(input_exe.as_mut_slice()).unwrap();
+        let perms = input_exe_file.metadata().unwrap().permissions();
+        (input_exe, perms)
+    };
+
+    // create the output executable
+    let mut file = std::fs::File::create("wasm.com").unwrap();
+    //file.set_permissions(input_perms).unwrap(); // not wasi compatible
+    file.write(input_exe.as_slice()).unwrap();
+
+    // append the zipped files
+    let mut zip = zip::ZipWriter::new(file);
+    zip.start_file("helloworld.txt", zip::write::FileOptions::default())
+        .unwrap();
+    zip.write(b"Hello, World!").unwrap();
+    zip.finish().unwrap();
 }
 
 fn get_hermitfile_path() -> String {
