@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::io::SeekFrom;
 
 use dockerfile_parser::{Dockerfile, Instruction};
 use serde::Serialize;
 use serde_json;
 use std::io::Read;
+use std::io::Seek;
 use std::io::Write;
 
 #[derive(Debug, Default, Serialize)]
@@ -103,16 +105,17 @@ fn create_hermit_executable(hermit: Hermitfile) {
     // load executable to use as the hermit
     let input_exe_name = std::env::var("EXE_NAME").unwrap();
     let (input_exe, input_perms) = {
-        let input_exe_size: usize = {
+        let (input_exe_size, mut input_exe_file) = {
             let input_exe_file = std::fs::File::open(&input_exe_name).unwrap();
             let mut input_exe_zip = zip::ZipArchive::new(input_exe_file).unwrap();
             // HACK .offset() doesn't appear to work
             // instead use the offset of the first file header
             let first_file_offset = input_exe_zip.by_index(0).unwrap().header_start();
-            first_file_offset.try_into().unwrap()
+            let mut exe_file = input_exe_zip.into_inner();
+            exe_file.seek(SeekFrom::Start(0)).unwrap();
+            (first_file_offset.try_into().unwrap(), exe_file)
         };
         let mut input_exe: Vec<u8> = vec![0; input_exe_size];
-        let mut input_exe_file = std::fs::File::open(input_exe_name).unwrap();
         input_exe_file.read_exact(input_exe.as_mut_slice()).unwrap();
         let perms = input_exe_file.metadata().unwrap().permissions();
         (input_exe, perms)
