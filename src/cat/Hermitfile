@@ -1,0 +1,3 @@
+# cat hermitfile
+MAP ["/"]
+ENV_PWD_IS_HOST_CWD

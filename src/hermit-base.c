@@ -285,6 +285,10 @@ static bool load_hermit_config(const char *hermit_json_path, list *dir_list, lis
         case HC_ENTRYPOINT:
         {
             const struct json_string_s *value = item->value->payload;
+            if (value->string_size == 0)
+            {
+                break;
+            }
             *func_name = memdup(value->string, value->string_size + 1);
             if (!(*func_name))
             {

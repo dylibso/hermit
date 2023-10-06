@@ -8,27 +8,29 @@ use std::io::Write;
 
 #[derive(Debug, Default, Serialize)]
 struct Hermitfile {
-    #[serde(rename = "FROM")]
-    pub from: String,
-    #[serde(rename = "LINK")]
-    pub link: Vec<String>,
+    // supported:
     #[serde(rename = "MAP")]
     pub map: Vec<String>,
-    #[serde(rename = "NET")]
-    pub net: Vec<String>,
-    #[serde(rename = "ARGV")]
-    pub argv: Vec<String>,
     #[serde(rename = "ENV")]
     pub env: Vec<String>,
-    #[serde(rename = "ENTRYPOINT")]
-    pub entrypoint: String,
     #[serde(rename = "ENV_PWD_IS_HOST_CWD")]
     pub uses_host_cwd: bool,
     #[serde(rename = "ENV_EXE_NAME_IS_HOST_EXE_NAME")]
     pub uses_host_exe_name: bool,
+    // not supported yet:
+    #[serde(rename = "FROM")]
+    pub from: String,
+    #[serde(rename = "LINK")]
+    pub link: Vec<String>,
+    #[serde(rename = "NET")]
+    pub net: Vec<String>,
+    #[serde(rename = "ARGV")]
+    pub argv: Vec<String>,
+    #[serde(rename = "ENTRYPOINT")]
+    pub entrypoint: String,
 }
 
-fn parse_hermitfile(hermitfile_path: &str) {
+fn parse_hermitfile(hermitfile_path: &str) -> Hermitfile {
     let file = std::fs::read(&hermitfile_path).unwrap_or_default();
     let dockerfile = String::from_utf8(file).unwrap_or_default();
     let hf = Dockerfile::parse(&dockerfile).unwrap();
@@ -94,6 +96,10 @@ fn parse_hermitfile(hermitfile_path: &str) {
         serde_json::to_string_pretty(&hermitfile).expect("json serialized")
     );
 
+    hermitfile
+}
+
+fn create_hermit_executable(hermit: Hermitfile) {
     // load executable to use as the hermit
     let input_exe_name = std::env::var("EXE_NAME").unwrap();
     let (input_exe, input_perms) = {
@@ -113,15 +119,30 @@ fn parse_hermitfile(hermitfile_path: &str) {
     };
 
     // create the output executable
-    let mut file = std::fs::File::create("wasm.com").unwrap();
-    //file.set_permissions(input_perms).unwrap(); // not wasi compatible
+    let output_exe_name = "wasm.com";
+    let mut file = std::fs::File::create(&output_exe_name).unwrap();
+    if file.set_permissions(input_perms).is_err() {
+        println!("Unable to make {output_exe_name} executable!");
+        println!("Due to platform limitations you must do it yourself! Run:");
+        println!("chmod +x {output_exe_name}");
+    }
     file.write(input_exe.as_slice()).unwrap();
 
     // append the zipped files
     let mut zip = zip::ZipWriter::new(file);
-    zip.start_file("helloworld.txt", zip::write::FileOptions::default())
-        .unwrap();
-    zip.write(b"Hello, World!").unwrap();
+    {
+        zip.start_file("hermit.json", zip::write::FileOptions::default())
+            .unwrap();
+        let hermit_json = serde_json::to_string_pretty(&hermit).expect("json serialized");
+        zip.write_all(hermit_json.as_bytes()).unwrap();
+    }
+    {
+        zip.start_file("main.wasm", zip::write::FileOptions::default())
+            .unwrap();
+        let wasm_name = "main.wasm";
+        let wasm = std::fs::read(wasm_name).unwrap();
+        zip.write_all(&wasm).unwrap();
+    }
     zip.finish().unwrap();
 }
 
@@ -155,5 +176,6 @@ fn get_hermitfile_path() -> String {
 
 fn main() {
     let hermitfile_path = get_hermitfile_path();
-    parse_hermitfile(&hermitfile_path);
+    let hermit = parse_hermitfile(&hermitfile_path);
+    create_hermit_executable(hermit);
 }
