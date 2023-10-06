@@ -28,10 +28,7 @@ struct Hermitfile {
     pub uses_host_exe_name: bool,
 }
 
-// TODO: originally wrote this to be exported to Wasm, and called as a library function, hence the
-// signature. Consider using &str instead.
-fn parse_hermitfile(ptr: *mut u8, len: u32) {
-    let hermitfile_path = unsafe { String::from_raw_parts(ptr, len as usize, len as usize) };
+fn parse_hermitfile(hermitfile_path: &str) {
     let file = std::fs::read(&hermitfile_path).unwrap_or_default();
     let dockerfile = String::from_utf8(file).unwrap_or_default();
     let hf = Dockerfile::parse(&dockerfile).unwrap();
@@ -158,8 +155,5 @@ fn get_hermitfile_path() -> String {
 
 fn main() {
     let hermitfile_path = get_hermitfile_path();
-    parse_hermitfile(
-        hermitfile_path.as_ptr() as *mut u8,
-        hermitfile_path.len() as u32,
-    );
+    parse_hermitfile(&hermitfile_path);
 }
