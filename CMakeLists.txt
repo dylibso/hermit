@@ -161,6 +161,24 @@ add_executable (hermit-base src/hermit-base.c src/wamr.c ${UNCOMMON_SHARED_SOURC
 set_target_properties (hermit-base PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries (hermit-base vmlib ${LLVM_AVAILABLE_LIBS} ${UV_A_LIBS} ${WASI_NN_LIBS} -lm -ldl -lpthread)
 
+set(cliwasmpath "${CMAKE_CURRENT_SOURCE_DIR}/target/wasm32-wasi/debug/hermitfile-parser.wasm")
+add_custom_command(OUTPUT ${cliwasmpath} COMMAND
+  cargo build --target wasm32-wasi
+  VERBATIM
+)
+add_custom_command(OUTPUT "main.wasm" COMMAND
+  cp ${cliwasmpath} main.wasm
+  DEPENDS ${cliwasmpath}
+  VERBATIM
+)
+add_custom_target(cli ALL DEPENDS "main.wasm")
+
+add_custom_command(OUTPUT "hermit.com" COMMAND
+  wasmtime run --env EXE_NAME=hermit-base.com --dir . main.wasm -- -f ${CMAKE_CURRENT_SOURCE_DIR}/src/cat/Hermitfile
+  DEPENDS hermit-base cli
+  VERBATIM)
+add_custom_target(hermit ALL DEPENDS "hermit.com")
+
 add_custom_command(OUTPUT "cowsay.hermit.com" COMMAND
   sh ${CMAKE_CURRENT_SOURCE_DIR}/_build_hermit_from_base.sh ${CMAKE_CURRENT_SOURCE_DIR}/src/cowsay ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS hermit-base
