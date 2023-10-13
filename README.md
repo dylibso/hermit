@@ -3,7 +3,11 @@
 
 ### Setup
 
-Clone with submodules so you get WAMR i.e: `git clone --recurse-submodules`
+Clone with submodules so you get WAMR and the forked dockerfile-parser-rs (the hermitfile parser) i.e: `git clone --recurse-submodules`
+
+Bootstrap pest (dockerfile-parser-rs dependency):
+
+`cd dockerfile-parser-rs/third-party/pest && cargo build --package pest_bootstrap`
 
 Clone the Cosmopolitan libc and setup `cosmocc` as mentioned in [Getting Started](https://github.com/jart/cosmopolitan/#getting-started). If `cosmocc` isn't in your `PATH` after adding a new shell, maybe append to `.bashrc` instead.
 
