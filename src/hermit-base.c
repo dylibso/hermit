@@ -12,6 +12,9 @@
 #include "json.h"
 #include "wamr.h"
 
+// cosmopolitan libc internal function
+char *GetProgramExecutableName(void);
+
 static const char *get_json_type_name(const json_type_t t)
 {
 #define X(name)       \

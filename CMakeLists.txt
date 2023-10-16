@@ -162,26 +162,12 @@ set_target_properties (hermit-base PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries (hermit-base vmlib ${LLVM_AVAILABLE_LIBS} ${UV_A_LIBS} ${WASI_NN_LIBS} -lm -ldl -lpthread)
 
 add_subdirectory(hermit-cli)
-message(STATUS "cliwasmpath ${cliwasmpath}")
-add_custom_command(OUTPUT "main.wasm" COMMAND
-  cp "${cliwasmpath}" main.wasm
-  DEPENDS cli
-  VERBATIM
-)
-add_custom_target(main-wasm ALL DEPENDS "main.wasm")
 
-file( COPY ${CMAKE_CURRENT_SOURCE_DIR}/hermit-cli/crates/hermitfile-parser/Hermitfile DESTINATION .)
 add_custom_command(OUTPUT "hermit.com" COMMAND
-  wasmtime run --env EXE_NAME=hermit-base.com --dir . main.wasm -- -f Hermitfile
-  DEPENDS hermit-base main-wasm
+  wasmtime run --env "PWD=${CMAKE_CURRENT_BINARY_DIR}" --env "EXE_NAME=hermit-base.com" --dir / "${cliwasmpath}" -- -f "${CMAKE_CURRENT_SOURCE_DIR}/hermit-cli/Hermitfile" -o hermit.com
+  DEPENDS hermit-base cli
   VERBATIM)
 add_custom_target(hermit ALL DEPENDS "hermit.com")
-add_custom_command(
-  TARGET hermit
-  POST_BUILD
-  COMMAND mv
-  ARGS "wasm.com" "hermit.com"
-)
 add_custom_command(
   TARGET hermit
   POST_BUILD
@@ -190,17 +176,10 @@ add_custom_command(
 )
 
 add_custom_command(OUTPUT "cowsay.hermit.com" COMMAND
-  ${CMAKE_CURRENT_BINARY_DIR}/hermit.com
+  ./hermit.com -f ${CMAKE_CURRENT_SOURCE_DIR}/src/cowsay/Hermitfile -o "cowsay.hermit.com"
   DEPENDS hermit
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/cowsay
   VERBATIM)
 add_custom_target(cowsay-hermit ALL DEPENDS "cowsay.hermit.com")
-add_custom_command(
-  TARGET cowsay-hermit
-  POST_BUILD
-  COMMAND mv
-  ARGS "${CMAKE_CURRENT_SOURCE_DIR}/src/cowsay/wasm.com" "cowsay.hermit.com"
-)
 add_custom_command(
   TARGET cowsay-hermit
   POST_BUILD
@@ -209,17 +188,10 @@ add_custom_command(
 )
 
 add_custom_command(OUTPUT "count_vowels.hermit.com" COMMAND
-  ${CMAKE_CURRENT_BINARY_DIR}/hermit.com
+  ./hermit.com -f ${CMAKE_CURRENT_SOURCE_DIR}/src/count_vowels/Hermitfile -o "count_vowels.hermit.com"
   DEPENDS hermit
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/count_vowels
   VERBATIM)
 add_custom_target(count_vowels-hermit ALL DEPENDS "count_vowels.hermit.com")
-add_custom_command(
-  TARGET count_vowels-hermit
-  POST_BUILD
-  COMMAND mv
-  ARGS "${CMAKE_CURRENT_SOURCE_DIR}/src/count_vowels/wasm.com" "count_vowels.hermit.com"
-)
 add_custom_command(
   TARGET count_vowels-hermit
   POST_BUILD
@@ -228,17 +200,10 @@ add_custom_command(
 )
 
 add_custom_command(OUTPUT "cat.hermit.com" COMMAND
-  ${CMAKE_CURRENT_BINARY_DIR}/hermit.com
+  ./hermit.com -f ${CMAKE_CURRENT_SOURCE_DIR}/src/cat/Hermitfile -o "cat.hermit.com"
   DEPENDS hermit
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/cat
   VERBATIM)
 add_custom_target(cat-hermit ALL DEPENDS "cat.hermit.com")
-add_custom_command(
-  TARGET cat-hermit
-  POST_BUILD
-  COMMAND mv
-  ARGS "${CMAKE_CURRENT_SOURCE_DIR}/src/cat/wasm.com" "cat.hermit.com"
-)
 add_custom_command(
   TARGET cat-hermit
   POST_BUILD

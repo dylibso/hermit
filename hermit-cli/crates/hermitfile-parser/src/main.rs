@@ -56,7 +56,11 @@ fn parse_hermitfile(hermitfile_path: &str) -> Hermitfile {
     for instruction in hf.instructions {
         match instruction {
             Instruction::From(ins) => {
-                hermitfile.from = ins.image.content;
+                let mut path = std::path::PathBuf::from(&hermitfile_path);
+                assert!(path.pop());
+                path.push(ins.image.content);
+                let wasm_path = path.into_os_string().into_string().unwrap();
+                hermitfile.from = wasm_path;
             }
             Instruction::Net(ins) => {
                 if let Some(arr) = ins.expr.as_exec() {
@@ -102,6 +106,10 @@ fn parse_hermitfile(hermitfile_path: &str) -> Hermitfile {
         }
     }
 
+    if hermitfile.from.is_empty() {
+        panic!("Missing mandatory item: FROM");
+    }
+
     env_map.iter().for_each(|(k, v)| {
         hermitfile.env.push(format!("{}={}", k, v));
     });
@@ -135,7 +143,7 @@ fn create_hermit_executable(hermit: Hermitfile) {
     };
 
     // create the output executable
-    let output_exe_name = "wasm.com";
+    let output_exe_name = get_output_path();
     let mut file = std::fs::File::create(&output_exe_name).unwrap();
     if file.set_permissions(input_perms).is_err() {
         println!("Unable to make {output_exe_name} executable!");
@@ -155,8 +163,7 @@ fn create_hermit_executable(hermit: Hermitfile) {
     {
         zip.start_file("main.wasm", zip::write::FileOptions::default())
             .unwrap();
-        let wasm_name = "main.wasm";
-        let wasm = std::fs::read(wasm_name).unwrap();
+        let wasm = std::fs::read(&hermit.from).unwrap();
         zip.write_all(&wasm).unwrap();
     }
     zip.finish().unwrap();
@@ -170,7 +177,7 @@ fn get_hermitfile_path() -> String {
     for arg in args {
         if use_next {
             hermitfile_path = arg.to_string();
-            continue;
+            break;
         }
 
         if arg == "-f" {
@@ -184,10 +191,40 @@ fn get_hermitfile_path() -> String {
             }
 
             hermitfile_path = parts[1].to_string();
+            break;
         }
     }
 
     hermitfile_path
+}
+
+fn get_output_path() -> String {
+    let mut output_path = "wasm.com".to_string();
+
+    let mut use_next = false;
+    let args = Box::new(std::env::args());
+    for arg in args {
+        if use_next {
+            output_path = arg.to_string();
+            break;
+        }
+
+        if arg == "-o" {
+            use_next = true;
+        }
+
+        if arg.starts_with("-o=") {
+            let parts = arg.split("=").collect::<Vec<&str>>();
+            if parts.len() != 2 {
+                continue;
+            }
+
+            output_path = parts[1].to_string();
+            break;
+        }
+    }
+
+    output_path
 }
 
 fn main() {
