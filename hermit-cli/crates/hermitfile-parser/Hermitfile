@@ -1,23 +1,4 @@
-# locate module w/ entrypoint and dependecies to link exports
-FROM mod.wasm
-# TODO: support FROM <URL> optional<SHA256>
-LINK ['dep1.wasm', 'dep2.wasm', 'https://wasmstore:6384/api/v1/module/sqlite3.wasm:{SHA256}'] 
-
-# configure the module instance with environment / resource access 
-
-MAP ["abc", "def", "ghi"]
-
-NET ['*.github.com', 'api.reddit.com', 'localhost:6379']
-
-ENV USER=root
-ENV NO_EQUALS is-ok
-ENV NAME=steve
-ENV KEY=Value KEY2=Value2
-
+# cat hermitfile
+MAP ["/"]
 ENV_PWD_IS_HOST_CWD
-        
 ENV_EXE_NAME_IS_HOST_EXE_NAME
-        
-# configure which function to call on startup
-ENTRYPOINT count_vowels
-

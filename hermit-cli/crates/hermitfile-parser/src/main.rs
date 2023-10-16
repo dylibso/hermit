@@ -8,27 +8,40 @@ use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
 
+fn is_false(b: &bool) -> bool {
+    *b == false
+}
+
 #[derive(Debug, Default, Serialize)]
 struct Hermitfile {
     // supported:
     #[serde(rename = "MAP")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub map: Vec<String>,
     #[serde(rename = "ENV")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<String>,
     #[serde(rename = "ENV_PWD_IS_HOST_CWD")]
+    #[serde(skip_serializing_if = "is_false")]
     pub uses_host_cwd: bool,
     #[serde(rename = "ENV_EXE_NAME_IS_HOST_EXE_NAME")]
+    #[serde(skip_serializing_if = "is_false")]
     pub uses_host_exe_name: bool,
     // not supported yet:
     #[serde(rename = "FROM")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub from: String,
     #[serde(rename = "LINK")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub link: Vec<String>,
     #[serde(rename = "NET")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub net: Vec<String>,
     #[serde(rename = "ARGV")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub argv: Vec<String>,
     #[serde(rename = "ENTRYPOINT")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub entrypoint: String,
 }
 
@@ -178,6 +191,10 @@ fn get_hermitfile_path() -> String {
 }
 
 fn main() {
+    // hack as wasi doesn't have a wayto set current directory
+    if let Ok(input_wd) = std::env::var("PWD") {
+        std::env::set_current_dir(input_wd).unwrap();
+    }
     let hermitfile_path = get_hermitfile_path();
     let hermit = parse_hermitfile(&hermitfile_path);
     create_hermit_executable(hermit);
