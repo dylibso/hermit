@@ -7,6 +7,7 @@ use serde_json;
 use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
+use std::os::wasi::ffi::OsStrExt;
 
 fn is_false(b: &bool) -> bool {
     *b == false
@@ -45,7 +46,7 @@ struct Hermitfile {
     pub entrypoint: String,
 }
 
-fn parse_hermitfile(hermitfile_path: &str) -> Hermitfile {
+fn parse_hermitfile(hermitfile_path: &std::ffi::OsStr) -> Hermitfile {
     let file = std::fs::read(&hermitfile_path).unwrap_or_default();
     let dockerfile = String::from_utf8(file).unwrap_or_default();
     let hf = Dockerfile::parse(&dockerfile).unwrap();
@@ -122,7 +123,7 @@ fn parse_hermitfile(hermitfile_path: &str) -> Hermitfile {
     hermitfile
 }
 
-fn create_hermit_executable(hermit: Hermitfile) {
+fn create_hermit_executable(output_exe_name: &std::ffi::OsStr, hermit: Hermitfile) {
     // load executable to use as the hermit
     let input_exe_name = std::env::var("EXE_NAME").unwrap();
     let (input_exe, input_perms) = {
@@ -143,12 +144,11 @@ fn create_hermit_executable(hermit: Hermitfile) {
     };
 
     // create the output executable
-    let output_exe_name = get_output_path();
     let mut file = std::fs::File::create(&output_exe_name).unwrap();
     if file.set_permissions(input_perms).is_err() {
-        println!("Unable to make {output_exe_name} executable!");
+        println!("Unable to make {:?} executable!", output_exe_name);
         println!("Due to platform limitations you must do it yourself! Run:");
-        println!("chmod +x {output_exe_name}");
+        println!("chmod +x {:?}", output_exe_name);
     }
     file.write(input_exe.as_slice()).unwrap();
 
@@ -169,62 +169,66 @@ fn create_hermit_executable(hermit: Hermitfile) {
     zip.finish().unwrap();
 }
 
-fn get_hermitfile_path() -> String {
-    let mut hermitfile_path = "Hermitfile".to_string();
-
-    let mut use_next = false;
-    let args = Box::new(std::env::args());
-    for arg in args {
-        if use_next {
-            hermitfile_path = arg.to_string();
-            break;
-        }
-
-        if arg == "-f" {
-            use_next = true;
-        }
-
-        if arg.starts_with("-f=") {
-            let parts = arg.split("=").collect::<Vec<&str>>();
-            if parts.len() != 2 {
-                continue;
-            }
-
-            hermitfile_path = parts[1].to_string();
-            break;
-        }
-    }
-
-    hermitfile_path
+struct HermitCliArgs {
+    hermitfile_path: std::ffi::OsString,
+    output_path: std::ffi::OsString,
 }
 
-fn get_output_path() -> String {
-    let mut output_path = "wasm.com".to_string();
+fn parse_hermit_args() -> HermitCliArgs {
+    let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
 
-    let mut use_next = false;
-    let args = Box::new(std::env::args());
-    for arg in args {
-        if use_next {
-            output_path = arg.to_string();
-            break;
-        }
+    let mut hermitfile_path: std::ffi::OsString = "Hermitfile".into();
+    let mut output_path: std::ffi::OsString = "wasm.com".into();
 
+    let mut args_iter = args.iter();
+    args_iter.next();
+    loop {
+        let arg = match args_iter.next() {
+            Some(arg) => arg,
+            None => break,
+        };
         if arg == "-o" {
-            use_next = true;
-        }
+            output_path = match args_iter.next() {
+                Some(arg) => arg.clone(),
+                None => panic!("-o provided without file"),
+            };
+            continue;
+        } else if arg == "-f" {
+            hermitfile_path = match args_iter.next() {
+                Some(arg) => arg.clone(),
+                None => panic!("-o provided without file"),
+            };
+            continue;
+        } else if arg == "-h" || arg == "--help" {
+            print!(
+                "{}",
+                r#"hermit.com [-f <path_to_Hermitfile] [-o <output_path>]
 
-        if arg.starts_with("-o=") {
-            let parts = arg.split("=").collect::<Vec<&str>>();
-            if parts.len() != 2 {
+If a path to a `Hermitfile` is not provided, it tries to load `Hermitfile` from
+the current directory. If an `output_path` is not provided, the hermit is
+written to `wasm.com` in the currently directly. On Unix-like operating systems
+you must `chmod +x wasm.com` to make it executable. This is required because
+WASI does not have a `chmod` function.
+"#
+            );
+            std::process::exit(0);
+        } else if arg.len() >= 4 {
+            let arg_bytes = arg.as_bytes();
+            let (name, value) = arg_bytes.split_at(3);
+            if name == b"-o=" {
+                output_path = std::ffi::OsStr::from_bytes(&value).into();
+                continue;
+            } else if name == b"-f=" {
+                hermitfile_path = std::ffi::OsStr::from_bytes(&value).into();
                 continue;
             }
-
-            output_path = parts[1].to_string();
-            break;
         }
+        panic!("Unhandled arg {:?}", arg);
     }
-
-    output_path
+    HermitCliArgs {
+        hermitfile_path,
+        output_path,
+    }
 }
 
 fn main() {
@@ -232,7 +236,7 @@ fn main() {
     if let Ok(input_wd) = std::env::var("PWD") {
         std::env::set_current_dir(input_wd).unwrap();
     }
-    let hermitfile_path = get_hermitfile_path();
-    let hermit = parse_hermitfile(&hermitfile_path);
-    create_hermit_executable(hermit);
+    let options = parse_hermit_args();
+    let hermit = parse_hermitfile(&options.hermitfile_path);
+    create_hermit_executable(&options.output_path, hermit);
 }
