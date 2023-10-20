@@ -47,9 +47,22 @@ struct Hermitfile {
 }
 
 fn parse_hermitfile(hermitfile_path: &std::ffi::OsStr) -> Hermitfile {
-    let file = std::fs::read(&hermitfile_path).unwrap_or_default();
-    let dockerfile = String::from_utf8(file).unwrap_or_default();
-    let hf = Dockerfile::parse(&dockerfile).unwrap();
+    let hf = {
+        let dockerfile = {
+            let file = match std::fs::read(&hermitfile_path) {
+                Ok(file) => file,
+                _ => panic!("Error reading {:?}", &hermitfile_path),
+            };
+            match String::from_utf8(file) {
+                Ok(dockerfile) => dockerfile,
+                _ => panic!("{:?} is not valid UTF-8", &hermitfile_path),
+            }
+        };
+        match Dockerfile::parse(&dockerfile) {
+            Ok(hf) => hf,
+            _ => panic!("{:?} has invalid Hermitfile syntax", &hermitfile_path),
+        }
+    };
 
     let mut hermitfile = Hermitfile::default();
     let mut env_map: HashMap<String, String> = HashMap::new();
@@ -125,11 +138,20 @@ fn parse_hermitfile(hermitfile_path: &std::ffi::OsStr) -> Hermitfile {
 
 fn create_hermit_executable(output_exe_name: &std::ffi::OsStr, hermit: Hermitfile) {
     // load executable to use as the hermit
-    let input_exe_name = std::env::var("EXE_NAME").unwrap();
     let (input_exe, input_perms) = {
         let (input_exe_size, mut input_exe_file) = {
-            let input_exe_file = std::fs::File::open(&input_exe_name).unwrap();
-            let mut input_exe_zip = zip::ZipArchive::new(input_exe_file).unwrap();
+            let input_exe_name = match std::env::var("EXE_NAME") {
+                Ok(input_exe_name) => input_exe_name,
+                _ => panic!("$EXE_NAME must be provided to build a hermit executable"),
+            };
+            let input_exe_file = match std::fs::File::open(&input_exe_name) {
+                Ok(input_exe_file) => input_exe_file,
+                _ => panic!("Error opening {input_exe_name}"),
+            };
+            let mut input_exe_zip = match zip::ZipArchive::new(input_exe_file) {
+                Ok(input_exe_file) => input_exe_file,
+                _ => panic!("Error opening {input_exe_name}, is it a ZIP/APE file?"),
+            };
             // HACK .offset() doesn't appear to work
             // instead use the offset of the first file header
             let first_file_offset = input_exe_zip.by_index(0).unwrap().header_start();
@@ -163,7 +185,10 @@ fn create_hermit_executable(output_exe_name: &std::ffi::OsStr, hermit: Hermitfil
     {
         zip.start_file("main.wasm", zip::write::FileOptions::default())
             .unwrap();
-        let wasm = std::fs::read(&hermit.from).unwrap();
+        let wasm = match std::fs::read(&hermit.from) {
+            Ok(wasm) => wasm,
+            _ => panic!("Error opening {}", hermit.from),
+        };
         zip.write_all(&wasm).unwrap();
     }
     zip.finish().unwrap();

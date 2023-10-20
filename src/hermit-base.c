@@ -147,6 +147,7 @@ static struct json_value_s *load_json_file(const char *json_path)
 
 static bool load_hermit_config(const char *hermit_json_path, list *dir_list, list *env_list, char **func_name)
 {
+    const bool debug = getenv("HERMIT_DEBUG_BASE") != NULL;
     defer_free struct json_value_s *json = load_json_file(hermit_json_path);
     if (json == NULL)
     {
@@ -328,7 +329,10 @@ static bool load_hermit_config(const char *hermit_json_path, list *dir_list, lis
         case HC_ARGV:
             break;
         }
-        fprintf(stderr, "hermit_loader: %s key: %.*s\n", ((config_index != HC_UNKNOWN) ? "found" : "unknown"), (int)name->string_size, name->string);
+        if (debug)
+        {
+            fprintf(stderr, "hermit-base: %s key: %.*s\n", ((config_index != HC_UNKNOWN) ? "found" : "unknown"), (int)name->string_size, name->string);
+        }
     }
     return true;
 }
