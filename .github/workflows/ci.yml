@@ -72,12 +72,12 @@ jobs:
         shell: bash
         run: |
           hermit/cowsay.hermit.com hello
-      - name: the new technology
-        shell: bash
-        run: |
           echo aaa | hermit/cowsay.hermit.com
           echo aaa > text.txt
           hermit/cat.hermit.com text.txt
+      - name: the new technology
+        shell: bash
+        run: |
           [[ $(echo aeiou | hermit/count_vowels.hermit.com) == 5 ]]
           [[ $(echo bcd | hermit/count_vowels.hermit.com) == 0 ]]
 
