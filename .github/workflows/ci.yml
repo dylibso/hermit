@@ -21,8 +21,6 @@ jobs:
           export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
           ape-install
           cosmocc --update
-      - name: Verify cosmocc installed properly
-        run: cosmocc --version
       - name: Install deps
         run: |
           cd dockerfile-parser-rs/third-party/pest
@@ -30,6 +28,7 @@ jobs:
       - name: Build APEs
         run: |
           export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
+          cosmocc --version
           ./build_hermit.sh
       - name: upload build artifacts
         uses: actions/upload-artifact@v3
