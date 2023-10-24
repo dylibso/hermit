@@ -64,11 +64,11 @@ jobs:
       - name: Test APEs
         shell: bash
         run: |
-          build/cowsay.hermit.com hello
-          echo aaa | build/cowsay.hermit.com
-          build/cat.hermit.com cosmopolitan/README.md
-          [[ $(echo aeiou | build/count_vowels.hermit.com) == 5 ]]
-          [[ $(echo bcd | build/count_vowels.hermit.com) == 0 ]]
+          hermit/cowsay.hermit.com hello
+          echo aaa | hermit/cowsay.hermit.com
+          hermit/cat.hermit.com cosmopolitan/README.md
+          [[ $(echo aeiou | hermit/count_vowels.hermit.com) == 5 ]]
+          [[ $(echo bcd | hermit/count_vowels.hermit.com) == 0 ]]
 
   create-release:
     name:    Create release
