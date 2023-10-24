@@ -164,7 +164,7 @@ target_link_libraries (hermit-base vmlib ${LLVM_AVAILABLE_LIBS} ${UV_A_LIBS} ${W
 add_subdirectory(hermit-cli)
 
 add_custom_command(OUTPUT "hermit.com" COMMAND
-  wasmtime run --env "PWD=${CMAKE_CURRENT_BINARY_DIR}" --env "EXE_NAME=hermit-base.com" --dir / "${cliwasmpath}" -- -f "${CMAKE_CURRENT_SOURCE_DIR}/hermit-cli/Hermitfile" -o hermit.com
+  wasmtime run --env "PWD=${CMAKE_CURRENT_BINARY_DIR}" --env "EXE_NAME=hermit-base.com" --dir / "${cliwasmpath}" -f "${CMAKE_CURRENT_SOURCE_DIR}/hermit-cli/Hermitfile" -o hermit.com
   DEPENDS hermit-base cli
   VERBATIM)
 add_custom_target(hermit ALL DEPENDS "hermit.com")
