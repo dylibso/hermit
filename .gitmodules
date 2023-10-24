@@ -1,3 +1,6 @@
 [submodule "wasm-micro-runtime"]
 	path = wasm-micro-runtime
 	url = https://github.com/bytecodealliance/wasm-micro-runtime
+[submodule "dockerfile-parser-rs"]
+	path = dockerfile-parser-rs
+	url = https://github.com/dylibso/dockerfile-parser-rs

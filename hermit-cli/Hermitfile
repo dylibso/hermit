@@ -1,0 +1,5 @@
+# cat hermitfile
+FROM target/wasm32-wasi/debug/hermitfile-parser.wasm
+MAP ["/"]
+ENV_PWD_IS_HOST_CWD
+ENV_EXE_NAME_IS_HOST_EXE_NAME

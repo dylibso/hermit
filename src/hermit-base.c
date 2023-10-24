@@ -12,6 +12,9 @@
 #include "json.h"
 #include "wamr.h"
 
+// cosmopolitan libc internal function
+char *GetProgramExecutableName(void);
+
 static const char *get_json_type_name(const json_type_t t)
 {
 #define X(name)       \
@@ -144,6 +147,7 @@ static struct json_value_s *load_json_file(const char *json_path)
 
 static bool load_hermit_config(const char *hermit_json_path, list *dir_list, list *env_list, char **func_name)
 {
+    const bool debug = getenv("HERMIT_DEBUG_BASE") != NULL;
     defer_free struct json_value_s *json = load_json_file(hermit_json_path);
     if (json == NULL)
     {
@@ -161,6 +165,7 @@ static bool load_hermit_config(const char *hermit_json_path, list *dir_list, lis
         HC_UNKNOWN = -1,
         HC_MAP,
         HC_ENV_PWD_IS_HOST_CWD,
+        HC_ENV_EXE_NAME_IS_HOST_EXE_NAME,
         HC_NET,
         HC_ARGV,
         HC_ENV,
@@ -177,6 +182,7 @@ static bool load_hermit_config(const char *hermit_json_path, list *dir_list, lis
         {"ENV_PWD_IS_HOST_CWD",
          json_type_true,
          HC_ENV_PWD_IS_HOST_CWD},
+        {"ENV_EXE_NAME_IS_HOST_EXE_NAME", json_type_true, HC_ENV_EXE_NAME_IS_HOST_EXE_NAME},
         {"ENV", json_type_array, HC_ENV},
         {"NET", json_type_array, HC_NET},
         {"ARGV", json_type_array, HC_ARGV},
@@ -249,6 +255,27 @@ static bool load_hermit_config(const char *hermit_json_path, list *dir_list, lis
             env_list->arr[env_list->size++] = pwd;
             break;
         }
+        case HC_ENV_EXE_NAME_IS_HOST_EXE_NAME:
+        {
+            if (!list_reserve(env_list, env_list->size + 1))
+            {
+                fprintf(stderr, "ENV_EXE_NAME_IS_HOST_EXE_NAME: list_reserve failed\n");
+                return false;
+            }
+            const char *exe = GetProgramExecutableName();
+            static const char exename_prefix[] = "EXE_NAME=";
+            const size_t exe_len = strlen(exe);
+            const size_t exename_size = sizeof(exename_prefix) + exe_len;
+            char *exename = malloc(exename_size);
+            if (!exename)
+            {
+                fprintf(stderr, "ENV_PWD_IS_HOST_CWD: malloc failed\n");
+                return false;
+            }
+            memcpy(mempcpy(exename, exename_prefix, sizeof(exename_prefix) - 1), exe, exe_len + 1);
+            env_list->arr[env_list->size++] = exename;
+            break;
+        }
         case HC_ENV:
         {
             const struct json_array_s *value = item->value->payload;
@@ -285,6 +312,10 @@ static bool load_hermit_config(const char *hermit_json_path, list *dir_list, lis
         case HC_ENTRYPOINT:
         {
             const struct json_string_s *value = item->value->payload;
+            if (value->string_size == 0)
+            {
+                break;
+            }
             *func_name = memdup(value->string, value->string_size + 1);
             if (!(*func_name))
             {
@@ -298,7 +329,10 @@ static bool load_hermit_config(const char *hermit_json_path, list *dir_list, lis
         case HC_ARGV:
             break;
         }
-        fprintf(stderr, "hermit_loader: %s key: %.*s\n", ((config_index != HC_UNKNOWN) ? "found" : "unknown"), (int)name->string_size, name->string);
+        if (debug)
+        {
+            fprintf(stderr, "hermit-base: %s key: %.*s\n", ((config_index != HC_UNKNOWN) ? "found" : "unknown"), (int)name->string_size, name->string);
+        }
     }
     return true;
 }
