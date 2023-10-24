@@ -68,7 +68,13 @@ jobs:
         shell: bash
         run: |
           chmod +x hermit/*
+      - name: cowsay 1
+        shell: bash
+        run: |
           hermit/cowsay.hermit.com hello
+      - name: the new technology
+        shell: bash
+        run: |
           echo aaa | hermit/cowsay.hermit.com
           echo aaa > text.txt
           hermit/cat.hermit.com text.txt
