@@ -1,0 +1,67 @@
+name: CI
+on:
+    pull_request:
+    workflow_dispatch:
+    push:
+      tags:
+        - 'v*.*.*'
+
+jobs:
+  build-binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Setup cosmocc
+        run: |
+          sudo mkdir -p /opt
+          sudo chmod 1777 /opt
+          git clone https://github.com/jart/cosmopolitan.git /opt/cosmo
+          export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
+          ape-install
+          cosmocc --update
+      - name: Install deps
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          rustup target add wasm32-wasi
+          cd dockerfile-parser-rs/third-party/pest
+          cargo build --package pest_bootstrap
+      - name: Build APEs
+        run: |
+          export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
+          cosmocc --version
+          export WASMTIME_HOME="$HOME/.wasmtime"
+          export PATH="$WASMTIME_HOME/bin:$PATH"
+          wasmtime --version
+          ./build_hermit.sh
+      - name: upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: hermit
+          path: |
+            build/hermit.com
+            build/cat.hermit.com
+            build/count_vowels.hermit.com
+            build/cowsay.hermit.com
+
+  create-release:
+    name:    Create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs:   [ build-binaries ]
+    steps:
+    - name: Fetch build artifacts
+      if:   ${{ github.ref_type == 'tag' }}
+      uses: actions/download-artifact@v3
+    - name: Publish release
+      if:   ${{ github.ref_type == 'tag' }}
+      uses: softprops/action-gh-release@v1
+      with:
+        fail_on_unmatched_files: true
+        files: |
+          hermit/hermit.com
+          hermit/cat.hermit.com
+          hermit/count_vowels.hermit.com
+          hermit/cowsay.hermit.com
