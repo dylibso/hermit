@@ -19,7 +19,7 @@ jobs:
           sudo chmod 1777 /opt
           git clone https://github.com/jart/cosmopolitan.git /opt/cosmo
           export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
-          echo 'PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"' >>~/.profile
+          echo 'PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"' >>~/.bashrc
           ape-install
           cosmocc --update
       - name: Verify cosmocc installed properly
