@@ -45,12 +45,46 @@ jobs:
             build/count_vowels.hermit.com
             build/cowsay.hermit.com
 
+  test:
+    name: Test ${{ matrix.os }}
+    needs: [build-binaries]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Install APE loader on Ubuntu
+        if:   ${{ matrix.os == 'ubuntu-latest' }}
+        shell: bash
+        run: |
+          sudo mkdir -p /opt
+          sudo chmod 1777 /opt
+          git clone https://github.com/jart/cosmopolitan.git /opt/cosmo
+          export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
+          ape-install
+      - name: Download APEs
+        uses: actions/download-artifact@v3
+      - name: Test APEs (no output on NT?)
+        shell: bash
+        run: |
+          chmod +x hermit/*
+          hermit/cowsay.hermit.com hello
+          echo aaa | hermit/cowsay.hermit.com
+          echo aaa > text.txt
+          hermit/cat.hermit.com text.txt
+      - name: Test, but not on the New Technology
+        if:   ${{ matrix.os != 'windows-latest' }}
+        shell: bash
+        run: |
+          [[ $(echo aeiou | hermit/count_vowels.hermit.com) == 5 ]]
+          [[ $(echo bcd | hermit/count_vowels.hermit.com) == 0 ]]
+
   create-release:
     name:    Create release
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    needs:   [ build-binaries ]
+    needs:   [ build-binaries, test ]
     steps:
     - name: Fetch build artifacts
       if:   ${{ github.ref_type == 'tag' }}
