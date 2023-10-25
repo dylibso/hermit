@@ -67,11 +67,13 @@ jobs:
       - name: Test APEs
         shell: bash
         run: |
-          echo HEEEEEEEEEEELLLOOOO
           chmod +x hermit/*
       - name: cowsay 1
         shell: bash
         run: |
+          echo HEEEEEEEEEEELLLOOOO
+          hermit/cowsay.hermit.com hello > dummy.txt
+          cat dummy.txt
           hermit/cowsay.hermit.com hello
           echo aaa | hermit/cowsay.hermit.com
           echo aaa > text.txt
