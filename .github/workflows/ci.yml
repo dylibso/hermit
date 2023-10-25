@@ -68,7 +68,7 @@ jobs:
         if:   ${{ matrix.os == 'windows-latest' }}
         shell: cmd
         run: |
-          hermit/cowsay.hermit.com hello
+          hermit\cowsay.hermit.com hello
       - name: Test APEs
         shell: bash
         run: |
