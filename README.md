@@ -106,10 +106,6 @@ must be present for the same executable to be run on Windows.
    `cosmocc` isn't in your `PATH` after adding a new shell, maybe append to
    `.bashrc` instead.
 
-4. Create this dummy header:
-
-   `touch /opt/cosmo/libc/isystem/sys/timeb.h`
-
 ### Build
 
 `./build_hermit.sh` configures and builds with cmake to the `build` dir.
