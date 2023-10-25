@@ -64,6 +64,11 @@ jobs:
           ape-install
       - name: Download APEs
         uses: actions/download-artifact@v3
+      - name: CMD.exe
+        if:   ${{ matrix.os == 'windows-latest' }}
+        shell: cmd
+        run: |
+          hermit/cowsay.hermit.com hello
       - name: Test APEs
         shell: bash
         run: |
