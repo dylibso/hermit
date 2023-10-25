@@ -67,6 +67,7 @@ jobs:
       - name: Test APEs
         shell: bash
         run: |
+          echo HEEEEEEEEEEELLLOOOO
           chmod +x hermit/*
       - name: cowsay 1
         shell: bash
