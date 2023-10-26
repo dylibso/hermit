@@ -11,7 +11,7 @@ See [releases](https://github.com/dylibso/hermit/releases).
 
 ## Usage
 
-`./hermit.com [-f <path_to_Hermitfile] [-o <output_path>]`
+`./hermit.com [-f <path_to_Hermitfile>] [-o <output_path>]`
 
 If a path to a `Hermitfile` is not provided, it tries to load `Hermitfile` from
 the current directory. If an `output_path` is not provided, the hermit is
