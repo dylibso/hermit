@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
+use clap;
 use dockerfile_parser::{Dockerfile, Instruction};
 use serde::Serialize;
 use serde_json;
@@ -194,66 +195,18 @@ fn create_hermit_executable(output_exe_name: &std::ffi::OsStr, hermit: Hermitfil
     zip.finish().unwrap();
 }
 
+#[derive(clap::Parser)]
+#[command(author, version, about, long_about = None)]
 struct HermitCliArgs {
+    #[arg(short = 'f', default_value = "Hermitfile")]
     hermitfile_path: std::ffi::OsString,
+    #[arg(short = 'o', default_value = "wasm.com")]
     output_path: std::ffi::OsString,
 }
 
 fn parse_hermit_args() -> HermitCliArgs {
-    let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
-
-    let mut hermitfile_path: std::ffi::OsString = "Hermitfile".into();
-    let mut output_path: std::ffi::OsString = "wasm.com".into();
-
-    let mut args_iter = args.iter();
-    args_iter.next();
-    loop {
-        let arg = match args_iter.next() {
-            Some(arg) => arg,
-            None => break,
-        };
-        if arg == "-o" {
-            output_path = match args_iter.next() {
-                Some(arg) => arg.clone(),
-                None => panic!("-o provided without file"),
-            };
-            continue;
-        } else if arg == "-f" {
-            hermitfile_path = match args_iter.next() {
-                Some(arg) => arg.clone(),
-                None => panic!("-o provided without file"),
-            };
-            continue;
-        } else if arg == "-h" || arg == "--help" {
-            print!(
-                "{}",
-                r#"hermit.com [-f <path_to_Hermitfile] [-o <output_path>]
-
-If a path to a `Hermitfile` is not provided, it tries to load `Hermitfile` from
-the current directory. If an `output_path` is not provided, the hermit is
-written to `wasm.com` in the currently directly. On Unix-like operating systems
-you must `chmod +x wasm.com` to make it executable. This is required because
-WASI does not have a `chmod` function.
-"#
-            );
-            std::process::exit(0);
-        } else if arg.len() >= 4 {
-            let arg_bytes = arg.as_bytes();
-            let (name, value) = arg_bytes.split_at(3);
-            if name == b"-o=" {
-                output_path = std::ffi::OsStr::from_bytes(&value).into();
-                continue;
-            } else if name == b"-f=" {
-                hermitfile_path = std::ffi::OsStr::from_bytes(&value).into();
-                continue;
-            }
-        }
-        panic!("Unhandled arg {:?}", arg);
-    }
-    HermitCliArgs {
-        hermitfile_path,
-        output_path,
-    }
+    let cli: HermitCliArgs = clap::Parser::parse();
+    cli
 }
 
 fn main() {
