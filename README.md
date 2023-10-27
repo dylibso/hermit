@@ -119,3 +119,7 @@ After building, try out:
 or
 
 `echo aeiou | ./build/count_vowels.hermit.com`
+
+## Community
+
+Hermit shares the [Extism Discord](https://discord.gg/cx3usBCWnc). Join `#hermit` to discuss working with or building Hermit.
