@@ -196,7 +196,7 @@ fn create_hermit_executable(output_exe_name: &std::ffi::OsStr, hermit: Hermitfil
 }
 
 #[derive(clap::Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(bin_name = "hermit.com", author, version, about, long_about = None)]
 struct HermitCliArgs {
     #[arg(short = 'f', default_value = "Hermitfile")]
     hermitfile_path: std::ffi::OsString,
