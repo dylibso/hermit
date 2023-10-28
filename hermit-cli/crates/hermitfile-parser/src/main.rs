@@ -198,8 +198,14 @@ fn create_hermit_executable(output_exe_name: &std::ffi::OsStr, hermit: Hermitfil
 #[derive(clap::Parser)]
 #[command(bin_name = "hermit.com", author, version, about, long_about = None)]
 struct HermitCliArgs {
+    /// Name of the Hermitfile
     #[arg(short = 'f', default_value = "Hermitfile")]
     hermitfile_path: std::ffi::OsString,
+    /// Output destination.
+    ///
+    /// On `unix` platforms, you will need to run `chmod +x <OUTPUT_PATH>` to
+    /// make it executable. This is required because WASI does not have a
+    /// `chmod` function.
     #[arg(short = 'o', default_value = "wasm.com")]
     output_path: std::ffi::OsString,
 }
