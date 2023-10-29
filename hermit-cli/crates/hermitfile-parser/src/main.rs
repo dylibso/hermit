@@ -210,9 +210,11 @@ struct HermitCliArgs {
     output_path: std::ffi::OsString,
 }
 
-fn parse_hermit_args() -> HermitCliArgs {
-    let cli: HermitCliArgs = clap::Parser::parse();
-    cli
+impl HermitCliArgs {
+    #[inline]
+    fn parse_args() -> Self {
+        clap::Parser::parse()
+    }
 }
 
 fn main() {
@@ -220,7 +222,7 @@ fn main() {
     if let Ok(input_wd) = std::env::var("PWD") {
         std::env::set_current_dir(input_wd).unwrap();
     }
-    let options = parse_hermit_args();
+    let options = HermitCliArgs::parse_args();
     let hermit = parse_hermitfile(&options.hermitfile_path);
     create_hermit_executable(&options.output_path, hermit);
 }
