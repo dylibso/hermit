@@ -4,15 +4,10 @@ use std::io::SeekFrom;
 use clap;
 use dockerfile_parser::{Dockerfile, Instruction};
 use serde::Serialize;
-use serde_json;
 use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
 use std::os::wasi::ffi::OsStrExt;
-
-fn is_false(b: &bool) -> bool {
-    *b == false
-}
 
 #[derive(Debug, Default, Serialize)]
 struct Hermitfile {
@@ -24,10 +19,10 @@ struct Hermitfile {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<String>,
     #[serde(rename = "ENV_PWD_IS_HOST_CWD")]
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub uses_host_cwd: bool,
     #[serde(rename = "ENV_EXE_NAME_IS_HOST_EXE_NAME")]
-    #[serde(skip_serializing_if = "is_false")]
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub uses_host_exe_name: bool,
     // not supported yet:
     #[serde(rename = "FROM")]
@@ -50,7 +45,7 @@ struct Hermitfile {
 fn parse_hermitfile(hermitfile_path: &std::ffi::OsStr) -> Hermitfile {
     let hf = {
         let dockerfile = {
-            let file = match std::fs::read(&hermitfile_path) {
+            let file = match std::fs::read(hermitfile_path) {
                 Ok(file) => file,
                 _ => panic!("Error reading {:?}", &hermitfile_path),
             };
@@ -167,13 +162,13 @@ fn create_hermit_executable(output_exe_name: &std::ffi::OsStr, hermit: Hermitfil
     };
 
     // create the output executable
-    let mut file = std::fs::File::create(&output_exe_name).unwrap();
+    let mut file = std::fs::File::create(output_exe_name).unwrap();
     if file.set_permissions(input_perms).is_err() {
         println!("Unable to make {:?} executable!", output_exe_name);
         println!("Due to platform limitations you must do it yourself! Run:");
         println!("chmod +x {:?}", output_exe_name);
     }
-    file.write(input_exe.as_slice()).unwrap();
+    file.write_all(input_exe.as_slice()).unwrap();
 
     // append the zipped files
     let mut zip = zip::ZipWriter::new(file);

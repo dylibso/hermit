@@ -41,6 +41,9 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif ()
 
+#lower case needed to identify the right hermitfile-parser's "Hermitfile.$CMAKE_BUILD_TYPE_LOWER" file 
+string(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER)
+
 if (NOT DEFINED WAMR_BUILD_INTERP)
   # Enable Interpreter by default
   set (WAMR_BUILD_INTERP 1)
@@ -164,7 +167,7 @@ target_link_libraries (hermit-base vmlib ${LLVM_AVAILABLE_LIBS} ${UV_A_LIBS} ${W
 add_subdirectory(hermit-cli)
 
 add_custom_command(OUTPUT "hermit.com" COMMAND
-  wasmtime run --env "PWD=${CMAKE_CURRENT_BINARY_DIR}" --env "EXE_NAME=hermit-base.com" --dir / "${cliwasmpath}" -f "${CMAKE_CURRENT_SOURCE_DIR}/hermit-cli/Hermitfile" -o hermit.com
+  wasmtime run --env "PWD=${CMAKE_CURRENT_BINARY_DIR}" --env "EXE_NAME=hermit-base.com" --dir / "${cliwasmpath}" -f "${CMAKE_CURRENT_SOURCE_DIR}/hermit-cli/Hermitfile.${CMAKE_BUILD_TYPE_LOWER}" -o hermit.com
   DEPENDS hermit-base cli
   VERBATIM)
 add_custom_target(hermit ALL DEPENDS "hermit.com")
