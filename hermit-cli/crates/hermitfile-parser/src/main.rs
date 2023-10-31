@@ -197,7 +197,7 @@ struct HermitCliArgs {
     hermitfile_path: std::ffi::OsString,
     /// Output file
     ///
-    /// on `unix`-like platforms, you will need to run `chmod +x <OUTPUT_FILE`
+    /// on `unix`-like platforms, you will need to run `chmod +x <OUTPUT_PATH>`
     /// to make it executable. This is required becasue `WASI` does not have a
     /// `chmod` function.
     #[arg(default_value = "main.wasm", short = 'o')]
