@@ -120,6 +120,11 @@ or
 
 `echo aeiou | ./build/count_vowels.hermit.com`
 
+## Benchmarks
+
+- Hermit-cli : `./benchmarks/bench-cli.sh` benchmark hermit cli, for more details check [docs](benchmarks/README.md).
+- Cli binaries produced by Hermit-cli : `./benchmarks/bench-artifacts.sh` benchmark produced binaries, for more details check [docs](benchmarks/README.md).
+
 ## Community
 
 Hermit shares the [Extism Discord](https://discord.gg/cx3usBCWnc). Join `#hermit` to discuss working with or building Hermit.
