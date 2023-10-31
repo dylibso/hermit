@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
+use clap;
 use dockerfile_parser::{Dockerfile, Instruction};
 use serde::Serialize;
 use std::io::Read;
 use std::io::Seek;
 use std::io::Write;
-use std::os::wasi::ffi::OsStrExt;
 
 #[derive(Debug, Default, Serialize)]
 struct Hermitfile {
@@ -189,65 +189,25 @@ fn create_hermit_executable(output_exe_name: &std::ffi::OsStr, hermit: Hermitfil
     zip.finish().unwrap();
 }
 
+#[derive(clap::Parser)]
+#[command(about, author, bin_name = "hermit.com", long_version = None, version)]
 struct HermitCliArgs {
+    /// Name of the `Hermitfile`
+    #[arg(default_value = "Hermitfile", short = 'f')]
     hermitfile_path: std::ffi::OsString,
+    /// Output file
+    ///
+    /// on `unix`-like platforms, you will need to run `chmod +x <OUTPUT_PATH>`
+    /// to make it executable. This is required becasue `WASI` does not have a
+    /// `chmod` function.
+    #[arg(default_value = "main.wasm", short = 'o')]
     output_path: std::ffi::OsString,
 }
-#[allow(clippy::print_literal)]
-fn parse_hermit_args() -> HermitCliArgs {
-    let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
 
-    let mut hermitfile_path: std::ffi::OsString = "Hermitfile".into();
-    let mut output_path: std::ffi::OsString = "wasm.com".into();
-
-    let mut args_iter = args.iter();
-    args_iter.next();
-    while let Some(arg) = args_iter.next() {
-        match (arg.len(), arg.to_str()) {
-            (_, Some("-o")) => {
-                if let Some(output_arg) = args_iter.next() {
-                    output_path = output_arg.clone();
-                } else {
-                    panic!("-o provided without file");
-                }
-            }
-            (_, Some("-f")) => {
-                if let Some(hermitfile_arg) = args_iter.next() {
-                    hermitfile_path = hermitfile_arg.clone();
-                } else {
-                    panic!("-f provided without file");
-                }
-            }
-            (_, Some("-h") | Some("--help")) => {
-                print!(
-                    "{}",
-                    r#"hermit.com [-f <path_to_Hermitfile] [-o <output_path>]
-
-If a path to a `Hermitfile` is not provided, it tries to load `Hermitfile` from
-the current directory. If an `output_path` is not provided, the hermit is
-written to `wasm.com` in the currently directly. On Unix-like operating systems
-you must `chmod +x wasm.com` to make it executable. This is required because
-WASI does not have a `chmod` function.
-"#
-                );
-                std::process::exit(0);
-            }
-            (4.., Some(arg)) if arg.starts_with("-o=") => {
-                let (_, output_value) = arg.as_bytes().split_at(3);
-                output_path = std::ffi::OsStr::from_bytes(output_value).into();
-            }
-            (4.., Some(arg)) if arg.starts_with("-f=") => {
-                let (_, output_value) = arg.as_bytes().split_at(3);
-                hermitfile_path = std::ffi::OsStr::from_bytes(output_value).into();
-            }
-            _ => {
-                panic!("Unhandled arg {:?}", arg);
-            }
-        }
-    }
-    HermitCliArgs {
-        hermitfile_path,
-        output_path,
+impl HermitCliArgs {
+    #[inline]
+    fn parse_args() -> Self {
+        clap::Parser::parse()
     }
 }
 
@@ -256,7 +216,7 @@ fn main() {
     if let Ok(input_wd) = std::env::var("PWD") {
         std::env::set_current_dir(input_wd).unwrap();
     }
-    let options = parse_hermit_args();
+    let options = HermitCliArgs::parse_args();
     let hermit = parse_hermitfile(&options.hermitfile_path);
     create_hermit_executable(&options.output_path, hermit);
 }
