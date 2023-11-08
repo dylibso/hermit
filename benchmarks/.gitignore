@@ -1,0 +1,4 @@
+*.json
+*.com
+benchmarks/bench-artifacts/*
+benchmarks/bench-cli/*
