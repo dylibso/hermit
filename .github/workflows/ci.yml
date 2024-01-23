@@ -61,6 +61,7 @@ jobs:
         shell: bash
         run: |
           sudo wget -O /usr/bin/ape https://cosmo.zip/pub/cosmos/bin/ape-$(uname -m).elf
+          sudo chmod +x /usr/bin/ape
           sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' >/proc/sys/fs/binfmt_misc/register"
       - name: Download APEs
         uses: actions/download-artifact@v3
@@ -68,7 +69,6 @@ jobs:
         shell: bash
         run: |
           chmod +x hermit/*
-          ls -la hermit
           hermit/cowsay.hermit.com hello
           echo aaa | hermit/cowsay.hermit.com
           echo aaa > text.txt
