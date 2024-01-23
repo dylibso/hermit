@@ -68,6 +68,7 @@ jobs:
         shell: bash
         run: |
           chmod +x hermit/*
+          ls -la hermit
           hermit/cowsay.hermit.com hello
           echo aaa | hermit/cowsay.hermit.com
           echo aaa > text.txt
