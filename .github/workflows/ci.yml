@@ -15,12 +15,15 @@ jobs:
           submodules: recursive
       - name: Setup cosmocc
         run: |
-          sudo mkdir -p /opt
-          sudo chmod 1777 /opt
-          git clone https://github.com/jart/cosmopolitan.git /opt/cosmo
-          export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
-          ape-install
-          cosmocc --update
+          sudo mkdir -p /opt/cosmocc
+          cd /opt/cosmocc
+          sudo wget https://cosmo.zip/pub/cosmocc/cosmocc.zip
+          sudo unzip cosmocc.zip
+          export PATH="/opt/cosmocc/bin:$PATH"
+      - name: Install ape loader
+        run: |
+          sudo cp /opt/cosmocc/bin/ape-$(uname -m).elf /usr/bin/ape
+          sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' >/proc/sys/fs/binfmt_misc/register"
       - name: Install deps
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
@@ -29,7 +32,7 @@ jobs:
           cargo build --package pest_bootstrap
       - name: Build APEs
         run: |
-          export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
+          export PATH="/opt/cosmocc/bin:$PATH"
           cosmocc --version
           export WASMTIME_HOME="$HOME/.wasmtime"
           export PATH="$WASMTIME_HOME/bin:$PATH"
@@ -57,11 +60,9 @@ jobs:
         if:   ${{ matrix.os == 'ubuntu-latest' }}
         shell: bash
         run: |
-          sudo mkdir -p /opt
-          sudo chmod 1777 /opt
-          git clone https://github.com/jart/cosmopolitan.git /opt/cosmo
-          export PATH="/opt/cosmo/bin:/opt/cosmos/bin:$PATH"
-          ape-install
+          sudo wget -O /usr/bin/ape https://cosmo.zip/pub/cosmos/bin/ape-$(uname -m).elf
+          sudo chmod +x /usr/bin/ape
+          sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' >/proc/sys/fs/binfmt_misc/register"
       - name: Download APEs
         uses: actions/download-artifact@v3
       - name: Test APEs (no output on NT?)
