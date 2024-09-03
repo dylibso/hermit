@@ -64,7 +64,7 @@ jobs:
           sudo chmod +x /usr/bin/ape
           sudo sh -c "echo ':APE:M::MZqFpD::/usr/bin/ape:' >/proc/sys/fs/binfmt_misc/register"
       - name: Download APEs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
       - name: Test APEs (no output on NT?)
         shell: bash
         run: |
@@ -89,7 +89,7 @@ jobs:
     steps:
     - name: Fetch build artifacts
       if:   ${{ github.ref_type == 'tag' }}
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4.1.7
     - name: Publish release
       if:   ${{ github.ref_type == 'tag' }}
       uses: softprops/action-gh-release@v1
